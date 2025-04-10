@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股綜合查詢與 AI 分析 (含法人進出)</title> <!-- 更新標題 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 marked.js 用於渲染 Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* --- 基本 & Tailwind --- */
+        body {
+            /* 為 CJK 字體提供更好的渲染 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Microsoft JhengHei", "PingFang TC", "Noto Sans TC";
+        }
+        .hidden { display: none; }
+        .text-red { color: #e53e3e; } /* Tailwind: text-red-600 */
+        .text-green { color: #38a169; } /* Tailwind: text-green-600 */
+
+        /* --- 從 File 22 複製/調整的樣式 --- */
+        h2 { /* 為 H2 應用一致的樣式 */
+            font-size: 1.3rem; /* 字體大小 */
+            margin-top: 25px;  /* 上邊距 */
+            margin-bottom: 15px; /* 下邊距 */
+            color: #1e40af; /* Tailwind blue-800 - 標題顏色 */
+            border-bottom: 2px solid #2563eb; /* Tailwind blue-600 - 底線 */
+            padding-bottom: 8px; /* 底線與文字間距 */
+        }
+        /* 訊息/警告/載入中 樣式 */
+        #messageArea, #warningArea {
+            margin-top: 15px; padding: 12px; border-radius: 4px; white-space: pre-wrap; font-size: 0.9rem;
+        }
+        .error { color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .loading-text { color: #004085; background-color: #cce5ff; border: 1px solid #b8daff; }
+        .warning { color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; }
+
+        /* 載入中旋轉圖示 */
+        .loading-indicator-area { /* 旋轉圖示和文字的容器 */
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1); /* 淺灰色邊框 */
+            border-radius: 50%; /* 圓形 */
+            border-top: 4px solid #2563eb; /* Tailwind blue-600 - 頂部顏色，製造旋轉效果 */
+            width: 30px; /* 寬度 */
+            height: 30px; /* 高度 */
+            animation: spin 1s linear infinite; /* 旋轉動畫 */
+            margin: 0 auto 10px; /* 置中及下方間距 */
+        }
+        @keyframes spin { /* 定義旋轉動畫 */
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 融資融券/比率區塊 樣式 */
+        .margin-details-container {
+            display: flex; flex-wrap: wrap; gap: 25px; margin-top: 15px; background-color: #fff; padding: 20px; border-radius: 5px; border: 1px solid #dee2e6;
+        }
+        .margin-column { flex: 1; min-width: 240px; }
+        .margin-column h3 { margin-top: 0; margin-bottom: 12px; font-size: 1.1rem; color: #343a40; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+        .margin-list { list-style: none; padding: 0; margin: 0; }
+        .margin-list li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dotted #e0e0e0; font-size: 0.95rem; }
+        .margin-list li:last-child { border-bottom: none; }
+        .margin-list li span:first-child { color: #495057; padding-right: 10px; }
+        .margin-list li span.value { font-weight: 500; text-align: right; }
+        .buy-color { color: #dc3545 !important; } /* 維持特定買進顏色 */
+        .sell-color { color: #198754 !important; } /* 維持特定賣出顏色 */
+        .margin-other-details { margin-top: 20px; padding: 12px 15px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; font-size: 0.95rem; }
+        .margin-other-details p { margin: 6px 0; display: flex; justify-content: space-between; }
+        .margin-other-details strong { color: #495057; padding-right: 10px; }
+        .margin-other-details span { font-weight: 500; }
+        #bwibbuResultsArea { background-color: #fff; padding: 20px; border-radius: 5px; border: 1px solid #dee2e6; margin-top: 25px; }
+        #bwibbuResultsArea p { margin: 10px 0; font-size: 1rem; display: flex; justify-content: space-between; }
+        #bwibbuResultsArea strong { color: #495057; padding-right: 15px; }
+        #bwibbuResultsArea span { font-weight: 500; }
+
+        /* 歷史資料表格 樣式 */
+        #historicalResultsArea { overflow-x: auto; margin-top: 25px; }
+        #historicalResultsArea table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 14px; background-color: #fff; border: 1px solid #dee2e6; border-radius: 5px; }
+        #historicalResultsArea th, #historicalResultsArea td { padding: 8px 10px; text-align: right; border: 1px solid #ddd; }
+        #historicalResultsArea th:first-child, #historicalResultsArea td:first-child { text-align: left; }
+        #historicalResultsArea th { background-color: #f8f9fa; font-weight: bold; }
+
+        /* AI 分析區塊 樣式 */
+        .analysis-section { margin-top: 20px; background: white; padding: 20px; border-radius: 4px; border: 1px solid #ddd; line-height: 1.6; font-size: 16px; /* max-width: 800px; */ /* 改用容器寬度 */ margin: 20px auto; }
+        .analysis-btn { /* 已改用 Tailwind class */ }
+
+        /* 表格/區塊間 增加垂直間距 */
+        .data-section + .data-section { margin-top: 1.5rem; }
+        /* TWSE 資料的包裝容器樣式 */
+        .twse-data-wrapper {
+             background-color: #f9fafb; /* Tailwind gray-50 */
+             padding: 1rem;
+             border-radius: 0.375rem; /* Tailwind rounded-md */
+             border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+             margin-top: 1.5rem; /* Tailwind mt-6 */
+        }
+        /* 覆蓋 Tailwind 的預設列表樣式 */
+        ul { list-style: none; padding: 0; }
+        li { margin: 0; }
+
+        /* --- AI 分析輸出優化樣式 --- */
+        #analysisOutput {
+            line-height: 1.7; /* 增加行高以提高可讀性 */
+            color: #374151; /* Tailwind gray-700 - 基本文字顏色 */
+        }
+        #analysisOutput h1 {
+            font-size: 1.75rem; /* Tailwind text-2xl */
+            font-weight: 700; /* font-bold */
+            margin-top: 1.5rem; /* mt-6 */
+            margin-bottom: 1rem; /* mb-4 */
+            color: #1f2937; /* Tailwind gray-800 */
+            border-bottom: 1px solid #e5e7eb; /* border-b border-gray-200 */
+            padding-bottom: 0.5rem; /* pb-2 */
+        }
+        #analysisOutput h2 {
+            font-size: 1.5rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            margin-top: 1.75rem; /* mt-7 - slightly more space before H2 */
+            margin-bottom: 0.75rem; /* mb-3 */
+            color: #111827; /* Tailwind gray-900 */
+            /* Reset the general H2 style specifically within #analysisOutput */
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        #analysisOutput h3 {
+            font-size: 1.25rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+            margin-top: 1.5rem; /* mt-6 */
+            margin-bottom: 0.5rem; /* mb-2 */
+            color: #1f2937; /* Tailwind gray-800 */
+        }
+        #analysisOutput p {
+            margin-bottom: 1rem; /* mb-4 - 增加段落間距 */
+        }
+        #analysisOutput ul {
+            list-style: disc; /* 使用實心圓點 */
+            padding-left: 1.75rem; /* pl-7 - 增加列表縮排 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        #analysisOutput ol {
+            list-style: decimal; /* 使用數字列表 */
+            padding-left: 1.75rem; /* pl-7 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        #analysisOutput li {
+            margin-bottom: 0.5rem; /* mb-2 - 列表項間距 */
+        }
+        /* 為巢狀列表增加一點頂部間距 */
+        #analysisOutput li > ul,
+        #analysisOutput li > ol {
+            margin-top: 0.5rem; /* mt-2 */
+            margin-bottom: 0.5rem; /* mb-2 within li */
+        }
+        #analysisOutput strong {
+            font-weight: 600; /* font-semibold - 讓粗體更明顯一點 */
+            color: #111827; /* Tailwind gray-900 */
+        }
+        #analysisOutput pre {
+            background-color: #f9fafb; /* Tailwind gray-50 */
+            padding: 1rem; /* p-4 */
+            border-radius: 0.375rem; /* rounded-md */
+            overflow-x: auto; /* 水平滾動處理長行 */
+            margin-top: 0.75rem; /* mt-3 */
+            margin-bottom: 1.25rem; /* mb-5 */
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; /* font-mono - 等寬字體 */
+            font-size: 0.9em; /* 程式碼區塊字體稍小 */
+            line-height: 1.6;
+            border: 1px solid #e5e7eb; /* border border-gray-200 */
+        }
+        /* pre 內的 code 標籤通常不需要額外樣式，繼承 pre 的即可 */
+        /* #analysisOutput code { } */
+
+        #analysisOutput hr {
+            margin-top: 2rem; /* my-8 - 分隔線上下間距加大 */
+            margin-bottom: 2rem;
+            border-top-width: 1px;
+            border-color: #d1d5db; /* border-gray-300 */
+        }
+        /* --- 結束 AI 分析輸出優化樣式 --- */
+    </style>
+</head>
+<body class="bg-gray-100">
+<div class="container mx-auto p-4 max-w-7xl"> <!-- 加大容器最大寬度 -->
+    <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">台股綜合查詢與 AI 分析 (含法人進出)</h1>
+
+    <!-- 警告訊息區域 (來自 File 22) -->
+    <div id="warningArea" class="mb-4 hidden"></div>
+
+    <!-- 查詢表單 (合併後) -->
+    <form id="searchForm" class="mb-6 p-4 bg-white rounded-lg shadow">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label for="stockId" class="block text-sm font-medium text-gray-700 mb-1">股票代號</label>
+                <input type="text" id="stockId" value="2330" class="w-full p-2 border border-gray-300 rounded" placeholder="例如: 2330" required>
+            </div>
+            <div>
+                <label for="historyDays" class="block text-sm font-medium text-gray-700 mb-1">查詢歷史天數</label>
+                <input type="number" id="historyDays" min="1" max="365" value="10" class="w-full p-2 border border-gray-300 rounded">
+            </div>
+             <div>
+                <label for="stockTypeSelect" class="block text-sm font-medium text-gray-700 mb-1">股票類型 (歷史資料)</label>
+                <select id="stockTypeSelect" class="w-full p-2 border border-gray-300 rounded bg-white">
+                    <option value="tse">上市 (TSE)</option>
+                    <option value="otc">上櫃 (OTC)</option>
+                </select>
+                 <small class="text-xs text-gray-500">注意：融資券/重點指標查詢上市(TSE)資料</small>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" id="searchButton" class="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400">
+                    查詢全部資料
+                </button>
+            </div>
+        </div>
+        <div class="mt-2 text-xs text-gray-500" id="dateRangePreview">
+            日期範圍: 計算中...
+        </div>
+    </form>
+
+    <!-- 通用訊息區域 (來自 File 22) -->
+    <div id="messageArea" class="p-4 mb-6 hidden"></div>
+    <!-- 特定錯誤訊息區域 (來自 File 28) -->
+    <div id="errorMessage" class="p-4 bg-red-100 text-red-700 rounded mb-6 hidden"></div>
+
+    <!-- 主要載入指示器 -->
+    <div id="loadingIndicator" class="loading-indicator-area p-4 bg-white rounded-lg shadow hidden">
+        <div class="spinner"></div>
+        <div class="text-gray-500">查詢所有資料中，請稍候...</div>
+    </div>
+
+    <!-- 無數據訊息 -->
+    <div id="noDataMessage" class="p-4 bg-white rounded-lg shadow hidden">
+      <div class="text-gray-500 text-center">尚無數據，請進行查詢</div>
+    </div>
+
+
+    <!-- 資料顯示區域容器 -->
+    <div id="dataDisplayContainer" class="hidden">
+
+        <!-- ========= 最新指標與融資券區塊 (來自 File 22) ========= -->
+        <div class="twse-data-wrapper data-section">
+            <h2 id="currentDataHeader" class="!mt-0">最新指標與融資券 (上市股票)</h2>
+            <!-- 融資融券 結果 -->
+            <div id="marginResultsArea" class="hidden">
+                <h3 id="marginStockNameHeader" class="text-lg font-semibold mb-3">融資融券餘額</h3>
+                <div class="margin-details-container">
+                    <div class="margin-column" id="marginPurchaseSection">
+                        <h3>融資 (Margin Purchase)</h3>
+                        <ul class="margin-list" id="marginPurchaseList"></ul>
+                    </div>
+                    <div class="margin-column" id="marginShortSellSection">
+                        <h3>融券 (Short Sale)</h3>
+                        <ul class="margin-list" id="marginShortSellList"></ul>
+                    </div>
+                </div>
+                <div class="margin-other-details">
+                    <p><strong>資券互抵:</strong> <span id="offsettingValue"></span></p>
+                    <p><strong>註記:</strong> <span id="noteValue"></span></p>
+                </div>
+            </div>
+
+            <!-- 主要比率 結果 -->
+            <div id="bwibbuResultsArea" class="mt-4 hidden"> <!-- 增加上方間距 -->
+                <h3 id="bwibbuStockNameHeader" class="text-lg font-semibold mb-3">重點指標</h3>
+                <p><strong>股票名稱:</strong> <span id="stockNameBwibbu"></span></p>
+                <p><strong>本益比:</strong> <span id="peRatio"></span></p>
+                <p><strong>殖利率 (%):</strong> <span id="dividendYield"></span></p>
+                <p><strong>股價淨值比:</strong> <span id="pbRatio"></span></p>
+            </div>
+             <p id="twseDataWarning" class="text-sm text-yellow-700 mt-3 hidden">提示：融資券與重點指標資料僅查詢上市(TSE)數據。</p>
+        </div>
+        <!-- ============================================================== -->
+
+
+        <!-- ========= 法人進出資料表格 (來自 File 28) ========= -->
+        <div id="institutionalDataContainer" class="data-section">
+             <!-- 表格容器會動態顯示/隱藏 -->
+            <!-- 表格 1: 自營商(自行買賣) -->
+            <div id="dealerSelfTable" class="table-container mb-6 p-4 bg-white rounded-lg shadow hidden">
+              <h2 class="text-lg font-bold mb-4 !mt-0">自營商 (自行買賣) - 法人進出</h2>
+              <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                  <thead>
+                    <tr>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買入(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">賣出(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買賣超(張)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dealerSelfBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 表格 2: 自營商(避險) -->
+            <div id="dealerHedgingTable" class="table-container mb-6 p-4 bg-white rounded-lg shadow hidden">
+              <h2 class="text-lg font-bold mb-4 !mt-0">自營商 (避險) - 法人進出</h2>
+              <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                   <thead>
+                    <tr>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買入(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">賣出(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買賣超(張)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dealerHedgingBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 表格 3: 外資 -->
+            <div id="foreignInvestorTable" class="table-container mb-6 p-4 bg-white rounded-lg shadow hidden">
+              <h2 class="text-lg font-bold mb-4 !mt-0">外資 - 法人進出</h2>
+              <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                   <thead>
+                    <tr>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買入(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">賣出(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買賣超(張)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="foreignInvestorBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 表格 4: 投信 -->
+            <div id="investmentTrustTable" class="table-container mb-6 p-4 bg-white rounded-lg shadow hidden">
+              <h2 class="text-lg font-bold mb-4 !mt-0">投信 - 法人進出</h2>
+              <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                  <thead>
+                    <tr>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買入(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">賣出(張)</th>
+                      <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase">買賣超(張)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="investmentTrustBody"></tbody>
+                </table>
+              </div>
+            </div>
+             <p id="institutionalDataWarning" class="text-sm text-yellow-700 mt-1 hidden">提示：法人進出資料來源為 FinMind API，單位為「張」。外資自營商資料已被過濾。</p>
+        </div>
+        <!-- =========================================================== -->
+
+
+        <!-- ========= 歷史成交資料區塊 (來自 File 22) ========= -->
+        <div id="historicalResultsArea" class="data-section p-4 bg-white rounded-lg shadow hidden">
+            <!-- 內容由 JS 生成 (displayStockHistory) -->
+        </div>
+        <!-- =========================================================== -->
+
+
+        <!-- ========= AI 互動區塊 (來自 File 22, 調整後) ========= -->
+        <div id="aiInteractionContainer" class="data-section mt-6 p-4 bg-white rounded-lg shadow hidden">
+             <h2>AI 分析與提問</h2>
+            <div class="mb-4"> <!-- 調整下方間距 -->
+                <label for="additionalQuestion" class="block text-sm font-medium text-gray-700 mb-1">追加 AI 提問 (可選):</label>
+                <textarea id="additionalQuestion" rows="3" placeholder="例如：綜合以上所有數據，這支股票短期內的操作建議？" class="w-full p-2 border border-gray-300 rounded"></textarea>
+            </div>
+
+            <div class="mt-4"> <!-- 調整上方間距 -->
+                <button id="analysisBtn" class="analysis-btn w-full p-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400">
+                    使用 AI 分析此股票 (綜合所有數據)
+                </button>
+            </div>
+
+            <div id="analysisLoading" class="loading-indicator-area hidden mt-4"> <!-- AI 載入中 -->
+                <div class="spinner"></div>
+                <p class="text-gray-500">AI 分析中，請稍候...</p>
+            </div>
+
+            <!-- AI 輸出結果 -->
+            <div id="analysisOutput" class="analysis-section hidden mt-4"></div>
+        </div>
+        <!-- =========================================================== -->
+
+    </div> <!-- 結束 資料顯示區域容器 -->
+
+
+    <div id="footerInfo" class="mt-6 text-xs text-gray-500 text-center">
+        資料來源: FinMind API, TWSE, TPEx, Google AI | 查詢中...
+    </div>
+</div>
+
+<script>
+    // --- 常數定義 ---
+    const FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0wMy0zMCAxMjowMTo0OSIsInVzZXJfaWQiOiJwaHl0b3BsYW5rdG9uIiwiaXAiOiIxMTQuMzguMTQxLjE0OSJ9.UkFJA6sGY5aA253bGiWptvXTHzQBqQNhjVh_E-0klgk"; // FinMind API Token (請替換)
+    const GEMINI_API_KEY = "AIzaSyDwt-vuhOQ3iFuxHzgIzVmBJf7UOCrn0wg"; // Google AI API 金鑰 (請替換!!)
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`; // Gemini API 端點
+    const TWSE_MARGIN_API = "https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN"; // 融資融券 API
+    const TWSE_RATIO_API = "https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"; // 本益比/殖利率/淨值比 API
+    const CORS_PROXY_URL = `https://api.allorigins.win/raw?url=`; // CORS 代理服務 URL
+
+    // --- 全域變數 ---
+    let currentMarginData = null;     // 儲存目前融資融券數據
+    let currentRatioData = null;      // 儲存目前主要比率數據
+    let stockHistoryData = null;    // 儲存歷史成交數據
+    let institutionalData = null;   // 儲存法人進出數據 (直接從 API 獲取)
+    let currentStockCode = '';        // 目前查詢的股票代號
+    let currentStockType = 'tse';     // 目前查詢的股票類型 (tse/otc)
+    let currentDays = 10;             // 目前查詢的歷史天數 (日曆天)
+
+    // --- DOM 元素參照 ---
+    // 將頁面上需要操作的元素宣告為變數，方便取用
+    let stockCodeInput, stockTypeSelect, daysInput, queryBtn, dateRangePreview,
+        loadingIndicator, messageArea, warningArea, errorMessage, noDataMessage,
+        dataDisplayContainer, // 所有結果的主要容器
+        // 最新 TWSE 資料相關元素
+        currentDataHeader, twseDataWrapper, marginResultsArea, marginStockNameHeader, marginPurchaseList,
+        marginShortSellList, offsettingValue, noteValue, bwibbuResultsArea,
+        bwibbuStockNameHeader, stockNameBwibbu, peRatio, dividendYield, pbRatio, twseDataWarning,
+        // 法人進出資料相關元素
+        institutionalDataContainer, institutionalDataWarning,
+        dealerSelfTable, dealerHedgingTable, foreignInvestorTable, investmentTrustTable,
+        dealerSelfBody, dealerHedgingBody, foreignInvestorBody, investmentTrustBody,
+        // 歷史成交資料相關元素
+        historicalResultsArea,
+        // AI 互動相關元素
+        aiInteractionContainer, additionalQuestion, analysisBtn, analysisLoading, analysisOutput,
+        // 頁腳
+        footerInfo;
+
+    // --- 初始化 ---
+    document.addEventListener('DOMContentLoaded', function() {
+        // 頁面載入完成後，將 HTML 元素賦值給對應的變數
+        stockCodeInput = document.getElementById('stockId');
+        stockTypeSelect = document.getElementById('stockTypeSelect');
+        daysInput = document.getElementById('historyDays');
+        queryBtn = document.getElementById('searchButton');
+        dateRangePreview = document.getElementById('dateRangePreview');
+        loadingIndicator = document.getElementById('loadingIndicator');
+        messageArea = document.getElementById('messageArea');
+        warningArea = document.getElementById('warningArea');
+        errorMessage = document.getElementById('errorMessage');
+        noDataMessage = document.getElementById('noDataMessage');
+        dataDisplayContainer = document.getElementById('dataDisplayContainer');
+
+        // 最新 TWSE 資料
+        currentDataHeader = document.getElementById('currentDataHeader');
+        twseDataWrapper = document.querySelector('.twse-data-wrapper');
+        marginResultsArea = document.getElementById('marginResultsArea');
+        marginStockNameHeader = document.getElementById('marginStockNameHeader');
+        marginPurchaseList = document.getElementById('marginPurchaseList');
+        marginShortSellList = document.getElementById('marginShortSellList');
+        offsettingValue = document.getElementById('offsettingValue');
+        noteValue = document.getElementById('noteValue');
+        bwibbuResultsArea = document.getElementById('bwibbuResultsArea');
+        bwibbuStockNameHeader = document.getElementById('bwibbuStockNameHeader');
+        stockNameBwibbu = document.getElementById('stockNameBwibbu');
+        peRatio = document.getElementById('peRatio');
+        dividendYield = document.getElementById('dividendYield');
+        pbRatio = document.getElementById('pbRatio');
+        twseDataWarning = document.getElementById('twseDataWarning');
+
+        // 法人進出資料
+        institutionalDataContainer = document.getElementById('institutionalDataContainer');
+        institutionalDataWarning = document.getElementById('institutionalDataWarning');
+        dealerSelfTable = document.getElementById('dealerSelfTable');
+        dealerHedgingTable = document.getElementById('dealerHedgingTable');
+        foreignInvestorTable = document.getElementById('foreignInvestorTable');
+        investmentTrustTable = document.getElementById('investmentTrustTable');
+        dealerSelfBody = document.getElementById('dealerSelfBody');
+        dealerHedgingBody = document.getElementById('dealerHedgingBody');
+        foreignInvestorBody = document.getElementById('foreignInvestorBody');
+        investmentTrustBody = document.getElementById('investmentTrustBody');
+
+        // 歷史成交資料
+        historicalResultsArea = document.getElementById('historicalResultsArea');
+
+        // AI 互動
+        aiInteractionContainer = document.getElementById('aiInteractionContainer');
+        additionalQuestion = document.getElementById('additionalQuestion');
+        analysisBtn = document.getElementById('analysisBtn');
+        analysisLoading = document.getElementById('analysisLoading');
+        analysisOutput = document.getElementById('analysisOutput');
+
+        // 頁腳
+        footerInfo = document.getElementById('footerInfo');
+
+        // 綁定事件監聽器
+        document.getElementById('searchForm').addEventListener('submit', handleSearch); // 監聽表單提交
+        stockCodeInput.addEventListener('keypress', function(event) { // 監聽股票代號輸入框的 Enter 鍵
+            if (event.key === 'Enter') { event.preventDefault(); handleSearch(event); }
+        });
+        daysInput.addEventListener('input', updateDateRange); // 監聽天數輸入框變化，更新日期預覽
+        analysisBtn.addEventListener('click', handleAnalysisClick); // 監聽 AI 分析按鈕點擊
+
+        // 頁面初始狀態設定
+        updateDateRange(); // 初始化日期範圍預覽
+        clearAllDisplays(false); // 清除顯示區，但保留初始警告
+        showWarning("注意：融資券/重點指標查詢依賴免費 CORS 代理 (allorigins.win)，穩定性無法保證。法人進出使用 FinMind API。歷史資料查詢證交所/櫃買中心。AI 分析使用 Google Gemini API。");
+        // 簡單檢查 API Key 是否為預設值或無效
+        if (GEMINI_API_KEY.startsWith("AIza") && GEMINI_API_KEY.length < 20) {
+             showWarning("警告：請在程式碼中替換有效的 Google AI API 金鑰以啟用 AI 分析功能。", true);
+             analysisBtn.disabled = true; // 若金鑰無效，禁用 AI 按鈕
+        }
+         if (!FINMIND_API_TOKEN || FINMIND_API_TOKEN.length < 50) {
+             showWarning("警告：請在程式碼中替換有效的 FinMind API Token 以查詢法人進出資料。", true);
+        }
+    });
+
+    // --- 輔助函數 ---
+
+    /**
+     * 顯示通用訊息
+     * @param {string} text - 要顯示的訊息文字
+     * @param {string} type - 訊息類型 ('loading-text', 'error', 'warning')，會影響樣式
+     */
+    function showMessage(text, type = 'loading-text') {
+        messageArea.textContent = text;
+        messageArea.className = `p-4 mb-6 ${type}`; // 使用 Tailwind class 和類型 class
+        messageArea.classList.remove('hidden'); // 顯示訊息區
+        errorMessage.classList.add('hidden'); // 同時隱藏特定錯誤區
+        if (type === 'error') console.error("顯示錯誤訊息:", text);
+    }
+
+    /**
+     * 顯示特定錯誤訊息
+     * @param {string} text - 要顯示的錯誤文字
+     */
+    function showError(text) {
+        errorMessage.textContent = text;
+        errorMessage.classList.remove('hidden'); // 顯示錯誤區
+        messageArea.classList.add('hidden'); // 隱藏通用訊息區
+        console.error("顯示錯誤訊息 (專用區塊):", text);
+    }
+
+    /**
+     * 顯示警告訊息 (會累加)
+     * @param {string} text - 要顯示的警告文字
+     * @param {boolean} isError - 是否使用錯誤樣式顯示警告
+     */
+    function showWarning(text, isError = false) {
+        const warningDiv = document.createElement('div'); // 創建一個新的 div 來放警告
+        warningDiv.textContent = text;
+        warningDiv.className = isError ? 'error' : 'warning'; // 根據 isError 決定樣式
+        warningArea.appendChild(warningDiv); // 將新 div 加入警告區
+        warningArea.classList.remove('hidden'); // 顯示警告區
+    }
+
+    /**
+     * 清除所有數據顯示區域和相關狀態
+     * @param {boolean} clearWarnings - 是否連同警告訊息一起清除
+     */
+    function clearAllDisplays(clearWarnings = true) {
+        messageArea.classList.add('hidden');        // 隱藏通用訊息
+        errorMessage.classList.add('hidden');       // 隱藏錯誤訊息
+        loadingIndicator.classList.add('hidden');   // 隱藏載入中
+        noDataMessage.classList.add('hidden');      // 隱藏無數據提示
+        dataDisplayContainer.classList.add('hidden'); // 隱藏主數據容器
+
+        if (clearWarnings) { // 如果需要，清除警告內容並隱藏警告區
+             warningArea.innerHTML = '';
+             warningArea.classList.add('hidden');
+        }
+
+        // 隱藏各個獨立的數據顯示區塊
+        twseDataWrapper.classList.add('hidden');
+        marginResultsArea.classList.add('hidden');
+        bwibbuResultsArea.classList.add('hidden');
+        twseDataWarning.classList.add('hidden');
+        institutionalDataContainer.classList.add('hidden');
+        dealerSelfTable.classList.add('hidden');
+        dealerHedgingTable.classList.add('hidden');
+        foreignInvestorTable.classList.add('hidden');
+        investmentTrustTable.classList.add('hidden');
+        institutionalDataWarning.classList.add('hidden');
+        historicalResultsArea.classList.add('hidden');
+        aiInteractionContainer.classList.add('hidden');
+        analysisOutput.classList.add('hidden');     // 隱藏 AI 輸出
+        analysisOutput.innerHTML = '';              // 清空 AI 輸出內容
+        analysisLoading.classList.add('hidden');    // 隱藏 AI 載入中
+
+        // 清除具體的數據顯示欄位內容
+        marginPurchaseList.innerHTML = '';
+        marginShortSellList.innerHTML = '';
+        offsettingValue.textContent = '';
+        noteValue.textContent = '';
+        stockNameBwibbu.textContent = '';
+        peRatio.textContent = '';
+        dividendYield.textContent = '';
+        pbRatio.textContent = '';
+        dealerSelfBody.innerHTML = '';
+        dealerHedgingBody.innerHTML = '';
+        foreignInvestorBody.innerHTML = '';
+        investmentTrustBody.innerHTML = '';
+        historicalResultsArea.innerHTML = '';
+        additionalQuestion.value = '';              // 清空追加提問輸入框
+
+        // 重設全域數據變數
+        currentMarginData = null;
+        currentRatioData = null;
+        stockHistoryData = null;
+        institutionalData = null;
+    }
+
+    /**
+     * 設定頁面的主要載入狀態
+     * @param {boolean} isLoading - 是否正在載入
+     */
+    function setLoadingState(isLoading) {
+        if (isLoading) {
+            clearAllDisplays(false); // 清除舊數據，保留警告
+            loadingIndicator.classList.remove('hidden'); // 顯示載入中
+            queryBtn.disabled = true; // 禁用查詢按鈕
+            queryBtn.textContent = '查詢中...'; // 更改按鈕文字
+        } else {
+            loadingIndicator.classList.add('hidden'); // 隱藏載入中
+            queryBtn.disabled = false; // 啟用查詢按鈕
+            queryBtn.textContent = '查詢全部資料'; // 恢復按鈕文字
+        }
+    }
+
+    /**
+     * 格式化日期為 YYYY-MM-DD
+     * @param {Date} date - 日期物件
+     * @returns {string} 格式化後的日期字串
+     */
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份從 0 開始，需加 1
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    /**
+     * 格式化日期為 YYYYMMDD (常用於部分 API)
+     * @param {Date} date - 日期物件
+     * @returns {string} 格式化後的日期字串
+     */
+    function formatDateForAPI(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}${month}${day}`;
+    }
+
+    /**
+     * 計算基於 N 個日曆天回溯的開始與結束日期
+     * @param {number} days - 回溯的日曆天數
+     * @returns {{startDate: string, endDate: string}} 開始與結束日期 (YYYY-MM-DD)
+     */
+    function calculateDateRange(days) {
+        const endDate = new Date(); // 結束日期為今天
+        const startDate = new Date(); // 開始日期先設為今天
+        // 將開始日期設定為 endDate 的 days-1 天前，形成包含 endDate 的 days 天範圍
+        startDate.setDate(endDate.getDate() - (days - 1));
+        return {
+            startDate: formatDate(startDate),
+            endDate: formatDate(endDate)
+        };
+    }
+
+     /**
+      * 更新日期範圍預覽文字
+      */
+     function updateDateRange() {
+      const days = parseInt(daysInput.value) || 10; // 若輸入無效則預設為 10 天
+      const range = calculateDateRange(days); // 計算日期範圍
+      dateRangePreview.textContent = `日期範圍: ${range.startDate} 至 ${range.endDate}`; // 更新顯示文字
+    }
+
+    /**
+     * 格式化數字 (加上千分位)
+     * @param {number|string} num - 要格式化的數字或數字字串
+     * @returns {string} 格式化後的字串，或在無法解析時返回原值
+     */
+     function formatNumber(num) {
+       if (typeof num !== 'number' || isNaN(num)) {
+           // 嘗試解析帶有逗號的數字字串
+           if (typeof num === 'string') {
+               const parsedNum = parseFloat(num.replace(/,/g, '')); // 移除逗號後解析
+               if (!isNaN(parsedNum)) {
+                    // 如果成功解析，則格式化
+                    return new Intl.NumberFormat('zh-TW').format(parsedNum);
+               }
+           }
+           return num; // 若非數字或無法解析，返回原值
+       }
+       // 如果是有效的數字，直接格式化
+      return new Intl.NumberFormat('zh-TW').format(num);
+    }
+
+
+    // --- 資料獲取函數 ---
+
+    /**
+     * 獲取最新的融資融券與重點指標數據 (僅限上市股票，透過 TWSE Open API + CORS 代理)
+     * @param {string} stockCode - 股票代號
+     * @returns {Promise<{marginData: object|null, ratioData: object|null, errors: string[]}>} 包含數據和錯誤訊息的物件
+     */
+    async function fetchCurrentDataTWSE(stockCode) {
+        const proxyMarginAPI = `${CORS_PROXY_URL}${encodeURIComponent(TWSE_MARGIN_API)}`; // 融資融券代理 URL
+        const proxyRatioAPI = `${CORS_PROXY_URL}${encodeURIComponent(TWSE_RATIO_API)}`;   // 重點指標代理 URL
+        const controller = new AbortController(); // 用於設定請求超時
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 秒超時
+
+        let marginResult = null, ratioResult = null; // 初始化結果
+        let errors = []; // 初始化錯誤訊息陣列
+
+        console.log(`正在透過 CORS 代理查詢 ${stockCode} 的 TWSE 融資券/重點指標...`);
+
+        try {
+            // 使用 Promise.allSettled 同時發送兩個請求，即使一個失敗也不會中斷另一個
+            const [marginResponse, ratioResponse] = await Promise.allSettled([
+                fetch(proxyMarginAPI, { signal: controller.signal }), // 傳入超時控制器信號
+                fetch(proxyRatioAPI, { signal: controller.signal })
+            ]);
+            clearTimeout(timeoutId); // 清除超時計時器
+
+            // 處理融資融券數據回應
+            if (marginResponse.status === 'fulfilled' && marginResponse.value.ok) { // 請求成功且狀態碼 OK
+                try {
+                    const data = await marginResponse.value.json(); // 解析 JSON
+                    if (!Array.isArray(data)) throw new Error("融資融券資料格式非預期陣列"); // 檢查格式
+                    // 在陣列中尋找符合股票代號的資料
+                    marginResult = data.find(stock => stock.股票代號 === stockCode) || null;
+                     console.log(`${stockCode} 的融資融券資料:`, marginResult ? '找到' : '未找到 (可能是 OTC 或無資料)');
+                } catch (e) { errors.push(`處理融資融券資料失敗: ${e.message}`); console.error("融資融券 JSON 解析錯誤:", e); }
+            } else { // 請求失敗或狀態碼非 OK
+                let errText = `查詢融資融券失敗`;
+                if (marginResponse.status === 'rejected') errText += `: ${marginResponse.reason.message}`; // Fetch 被拒絕 (例如超時)
+                else if (marginResponse.value && !marginResponse.value.ok) errText += `: 代理服務錯誤 ${marginResponse.value.status}`; // 代理伺服器返回錯誤
+                else errText += ": 未知網路/代理錯誤";
+                errors.push(errText); console.error("融資融券 fetch 錯誤:", marginResponse);
+            }
+
+            // 處理重點指標數據回應 (邏輯同上)
+            if (ratioResponse.status === 'fulfilled' && ratioResponse.value.ok) {
+                try {
+                    const data = await ratioResponse.value.json();
+                    if (!Array.isArray(data)) throw new Error("重點指標資料格式非預期陣列");
+                    ratioResult = data.find(stock => stock.Code === stockCode) || null;
+                     console.log(`${stockCode} 的重點指標資料:`, ratioResult ? '找到' : '未找到 (可能是 OTC 或無資料)');
+                } catch (e) { errors.push(`處理重點指標資料失敗: ${e.message}`); console.error("重點指標 JSON 解析錯誤:", e); }
+            } else {
+                let errText = `查詢重點指標失敗`;
+                 if (ratioResponse.status === 'rejected') errText += `: ${ratioResponse.reason.message}`;
+                 else if (ratioResponse.value && !ratioResponse.value.ok) errText += `: 代理服務錯誤 ${ratioResponse.value.status}`;
+                 else errText += ": 未知網路/代理錯誤";
+                errors.push(errText); console.error("重點指標 fetch 錯誤:", ratioResponse);
+            }
+
+        } catch (error) { // 捕獲 Promise.allSettled 本身的潛在錯誤 (較少見)
+            errors.push(`查詢 TWSE 目前資料時發生意外錯誤: ${error.message}`);
+            console.error("查詢 TWSE 當前數據意外錯誤:", error);
+        }
+
+        return { marginData: marginResult, ratioData: ratioResult, errors: errors }; // 返回結果和錯誤列表
+    }
+
+    /**
+     * 獲取指定日期區間內的歷史成交數據 (直接查詢 TWSE 或 TPEx)
+     * @param {string} stockCode - 股票代號
+     * @param {string} stockType - 股票類型 ('tse' 或 'otc')
+     * @param {string} startDateStr - 開始日期 (YYYY-MM-DD)
+     * @param {string} endDateStr - 結束日期 (YYYY-MM-DD)
+     * @returns {Promise<{historyData: object[], errors: string[]}>} 包含數據和錯誤訊息的物件
+     */
+    async function fetchHistoricalData(stockCode, stockType, startDateStr, endDateStr) {
+        let allData = []; // 儲存所有月份撈取的原始數據
+        let fetchErrors = []; // 儲存抓取過程中的錯誤訊息
+        const startDate = new Date(startDateStr.replace(/-/g, '/')); // 將 YYYY-MM-DD 轉為 Date 物件
+        const endDate = new Date(endDateStr.replace(/-/g, '/'));   // 將 YYYY-MM-DD 轉為 Date 物件
+
+        console.log(`正在查詢 ${stockCode} (${stockType}) 在 ${startDateStr} 到 ${endDateStr} 之間的歷史成交資料...`);
+
+        // 決定需要查詢哪些月份的資料
+        const monthsToQuery = new Set(); // 使用 Set 自動去重
+        // 從結束日期的月份開始，往前推到開始日期的月份
+        let currentMonthDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1); // 當前月份的第一天
+        const startMonthDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1); // 開始月份的第一天
+
+        while (currentMonthDate >= startMonthDate) {
+            monthsToQuery.add(formatDateForAPI(currentMonthDate).substring(0, 6)); // 加入 YYYYMM 格式的月份字串
+            currentMonthDate.setMonth(currentMonthDate.getMonth() - 1); // 往前推一個月
+        }
+
+        console.log("預計查詢月份:", Array.from(monthsToQuery));
+
+        try {
+            // 針對需要查詢的每個月份發送 API 請求
+            for (const yearMonth of monthsToQuery) {
+                const dateStrForQuery = yearMonth + '01'; // 使用該月第一天作為 API 查詢參數
+
+                let url; // API URL
+                if (stockType === 'tse') { // 上市股票 URL
+                     url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${dateStrForQuery}&stockNo=${stockCode}&_=${Date.now()}`;
+                } else { // 上櫃股票 URL
+                    const rocYear = parseInt(yearMonth.substring(0, 4)) - 1911; // 西元年轉民國年
+                    const monthStr = yearMonth.substring(4, 6); // 取得月份 MM
+                    url = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?d=${rocYear}/${monthStr}&stkno=${stockCode}&_=${Date.now()}`;
+                }
+
+                console.log(`查詢歷史資料 URL (${yearMonth}): ${url}`);
+                try {
+                    const response = await fetch(url); // 發送請求
+                    // 在請求之間加入短暫延遲，避免過於頻繁而被阻擋
+                    await new Promise(resolve => setTimeout(resolve, 700 + Math.random() * 400));
+
+                    if (!response.ok) { // HTTP 狀態碼非 2xx
+                        console.warn(`查詢月份 ${yearMonth} 歷史資料時發生 HTTP 錯誤: ${response.status}`);
+                        fetchErrors.push(`查詢 ${yearMonth} 歷史資料失敗 (狀態 ${response.status})`);
+                        continue; // 跳過這個月份，繼續查詢下一個
+                    }
+                    const data = await response.json(); // 解析 JSON 回應
+
+                    let monthData = []; // 儲存該月份解析出的數據
+                    // --- 解析 TSE 或 OTC 的數據 ---
+                    if (stockType === 'tse') {
+                        if (data.stat === 'OK' && data.data && data.data.length > 0) { // 確認 API 回應狀態正常且有數據
+                            monthData = data.data.map(row => {
+                                const dateParts = row[0].trim().split('/'); // 日期格式: "110/01/01"
+                                const year = parseInt(dateParts[0]) + 1911; // 民國年轉西元年
+                                const date = `${year}/${dateParts[1].padStart(2,'0')}/${dateParts[2].padStart(2,'0')}`; // 格式化為 YYYY/MM/DD
+                                return {
+                                    date: date,
+                                    volume: parseInt(row[1].replace(/,/g, ''), 10) || 0, // 成交股數
+                                    openPrice: parseFloat(row[3].replace(/,/g, '')) || 0, // 開盤價
+                                    highPrice: parseFloat(row[4].replace(/,/g, '')) || 0, // 最高價
+                                    lowPrice: parseFloat(row[5].replace(/,/g, '')) || 0,  // 最低價
+                                    closePrice: parseFloat(row[6].replace(/,/g, '')) || 0, // 收盤價
+                                };
+                            }).filter(item => !isNaN(item.closePrice) && item.volume > 0); // 過濾掉無效數據 (收盤價非數字或成交量為0)
+                        } else if (data.stat && data.stat !== 'OK' && data.stat !== '很抱歉，沒有符合條件的資料!' && data.stat !== '查詢日期大於今日，請重新查詢!') {
+                            // 如果 API 回應非 OK，且不是常見的無資料訊息，則記錄錯誤
+                            fetchErrors.push(`查詢 ${yearMonth} TSE 歷史資料返回: ${data.stat}`);
+                        }
+                    } else { // otc
+                        if (data.aaData && data.aaData.length > 0) { // OTC 數據在 aaData 欄位
+                             monthData = data.aaData.map(row => {
+                                const dateParts = row[0].trim().split('/'); // 日期格式: "110/01/01"
+                                const year = parseInt(dateParts[0]) + 1911; // 民國年轉西元年
+                                const date = `${year}/${dateParts[1].padStart(2,'0')}/${dateParts[2].padStart(2,'0')}`; // 格式化為 YYYY/MM/DD
+                                return {
+                                    date: date,
+                                    volume: parseInt(row[7].replace(/,/g, ''), 10) * 1000 || 0, // 成交股數 (單位: 千股 -> 股)
+                                    openPrice: parseFloat(row[1].replace(/,/g, '')) || 0, // 開盤價
+                                    highPrice: parseFloat(row[2].replace(/,/g, '')) || 0, // 最高價
+                                    lowPrice: parseFloat(row[3].replace(/,/g, '')) || 0,  // 最低價
+                                    closePrice: parseFloat(row[4].replace(/,/g, '')) || 0, // 收盤價
+                                };
+                             }).filter(item => !isNaN(item.closePrice) && item.volume > 0); // 過濾無效數據
+                        }
+                    }
+                    // --- 解析結束 ---
+
+                    if (monthData.length > 0) {
+                        allData.push(...monthData); // 將該月份的數據加入總數據陣列
+                    } else {
+                        console.log(`月份 ${yearMonth} 未解析到有效的歷史資料`);
+                    }
+
+                } catch (err) { // 捕獲 fetch 或 JSON 解析過程中的錯誤
+                    console.error(`處理月份 ${yearMonth} 歷史資料時發生錯誤:`, err);
+                    fetchErrors.push(`處理 ${yearMonth} 歷史資料時發生錯誤: ${err.message}`);
+                }
+            } // 結束月份迴圈
+
+            // 所有月份查詢完成後，處理收集到的數據 allData
+            // 1. 去除重複數據 (可能因跨月查詢邊界導致)
+            const uniqueData = allData.reduce((acc, current) => {
+                if (!acc.find(item => item.date === current.date)) {
+                    acc.push(current);
+                }
+                return acc;
+            }, []);
+
+            // 2. 過濾掉不在指定日期區間 (startDateStr 到 endDateStr) 內的數據
+            const filteredData = uniqueData.filter(item => {
+                 const itemDateStr = item.date.replace(/\//g, '-'); // 將 YYYY/MM/DD 轉為 YYYY-MM-DD 比較
+                 return itemDateStr >= startDateStr && itemDateStr <= endDateStr;
+            });
+
+            // 3. 將最終結果按日期降冪排序
+            const sortedData = filteredData.sort((a, b) => b.date.localeCompare(a.date));
+
+            console.log(`成功過濾歷史資料，得到 ${sortedData.length} 筆在 ${startDateStr} 到 ${endDateStr} 區間內的記錄。`);
+            return { historyData: sortedData, errors: fetchErrors }; // 返回最終數據和錯誤列表
+
+        } catch (err) { // 捕獲月份迴圈外的意外錯誤
+            console.error('查詢歷史資料過程中發生嚴重錯誤:', err);
+            fetchErrors.push(`查詢歷史資料時發生嚴重錯誤: ${err.message}`);
+            return { historyData: [], errors: fetchErrors }; // 返回空數據和錯誤
+        }
+    }
+
+
+    /**
+     * 獲取指定日期區間內的法人進出數據 (透過 FinMind API)
+     * @param {string} stockId - 股票代號
+     * @param {string} startDateStr - 開始日期 (YYYY-MM-DD)
+     * @param {string} endDateStr - 結束日期 (YYYY-MM-DD)
+     * @returns {Promise<{institutionalData: object[], errors: string[]}>} 包含數據和錯誤訊息的物件
+     */
+    async function fetchInstitutionalData(stockId, startDateStr, endDateStr) {
+        const url = "https://api.finmindtrade.com/api/v4/data"; // FinMind API 端點
+        const params = new URLSearchParams({ // 建立查詢參數
+            dataset: "TaiwanStockInstitutionalInvestorsBuySell", // 指定資料集
+            data_id: stockId,           // 股票代號
+            start_date: startDateStr,   // 開始日期
+            end_date: endDateStr,     // 結束日期
+            token: FINMIND_API_TOKEN    // API Token
+        });
+        const queryString = params.toString(); // 將參數轉為查詢字串
+        console.log("正在查詢 FinMind 法人進出資料 URL:", `${url}?${queryString}`);
+
+        let errors = []; // 初始化錯誤列表
+        let resultData = []; // 初始化結果數據
+
+        try {
+            const response = await fetch(`${url}?${queryString}`); // 發送請求
+
+            if (!response.ok) { // HTTP 狀態碼非 2xx
+                const errorBody = await response.text(); // 嘗試讀取錯誤回應內容
+                console.error("FinMind API 錯誤回應:", errorBody);
+                throw new Error(`FinMind API錯誤: ${response.status} ${response.statusText}`); // 拋出錯誤
+            }
+
+            const jsonData = await response.json(); // 解析 JSON 回應
+            console.log("FinMind API 回應數據:", jsonData);
+
+            if (jsonData.msg !== "success") { // 檢查 API 回應訊息是否成功
+                throw new Error(`FinMind API 未成功: ${jsonData.msg || '未知錯誤'}`);
+            }
+
+             if (!jsonData.data || jsonData.data.length === 0) { // 檢查是否有數據
+                 console.log("FinMind: 在查詢區間內未找到相關法人進出數據。");
+                 // 注意：這不是一個錯誤，只是沒有數據
+             } else {
+                 resultData = jsonData.data; // 將獲取的數據存入 resultData
+             }
+
+        } catch(error) { // 捕獲 fetch 或 JSON 解析過程中的錯誤
+             console.error("查詢 FinMind 資料錯誤:", error);
+             errors.push(`獲取法人進出數據時發生錯誤: ${error.message}`);
+        }
+
+        return { institutionalData: resultData, errors: errors }; // 返回數據和錯誤列表
+    }
+
+
+    // --- 顯示函數 ---
+
+    /**
+     * 顯示融資融券與重點指標數據
+     * @param {object|null} marginData - 融資融券數據
+     * @param {object|null} ratioData - 重點指標數據
+     * @param {string} stockCode - 股票代號
+     */
+    function displayMarginRatioData(marginData, ratioData, stockCode) {
+        let stockName = 'N/A'; // 初始化股票名稱
+        let dataFound = false; // 標記是否有找到任何一種數據
+
+        // 顯示融資融券數據
+        if (marginData) {
+            dataFound = true; // 標記找到數據
+            stockName = marginData.股票名稱 || stockName; // 更新股票名稱
+            marginStockNameHeader.textContent = `融資融券餘額: ${stockCode} - ${stockName}`;
+            marginPurchaseList.innerHTML = ''; // 清空舊列表
+            marginShortSellList.innerHTML = ''; // 清空舊列表
+
+            // 定義要顯示的融資欄位
+            const marginFields = [
+                { key: '融資買進', label: '買進' }, { key: '融資賣出', label: '賣出' },
+                { key: '融資現金償還', label: '現償' }, { key: '融資今日餘額', label: '今日餘額' },
+                { key: '融資前日餘額', label: '前日餘額' }, { key: '融資限額', label: '限額' }
+            ];
+            // 定義要顯示的融券欄位
+            const shortSellFields = [
+                { key: '融券買進', label: '買進' }, { key: '融券賣出', label: '賣出' },
+                { key: '融券現券償還', label: '現償' }, { key: '融券今日餘額', label: '今日餘額' },
+                { key: '融券前日餘額', label: '前日餘額' }, { key: '融券限額', label: '限額' }
+            ];
+
+            // 遍歷融資欄位並產生列表項目
+            marginFields.forEach(item => {
+                const li = document.createElement('li');
+                const value = formatNumber(marginData[item.key]) || '-'; // 格式化數字
+                let valueClass = 'value'; // 基本樣式 class
+                // 根據關鍵字加上買/賣顏色 class
+                if (item.key.includes('買進')) valueClass += ' buy-color';
+                else if (item.key.includes('賣出')) valueClass += ' sell-color';
+                li.innerHTML = `<span>${item.label}</span><span class="${valueClass}">${value}</span>`;
+                marginPurchaseList.appendChild(li); // 加入列表
+            });
+
+            // 遍歷融券欄位並產生列表項目 (邏輯同上)
+            shortSellFields.forEach(item => {
+                const li = document.createElement('li');
+                 const value = formatNumber(marginData[item.key]) || '-';
+                 let valueClass = 'value';
+                if (item.key.includes('買進')) valueClass += ' buy-color';
+                else if (item.key.includes('賣出')) valueClass += ' sell-color';
+                li.innerHTML = `<span>${item.label}</span><span class="${valueClass}">${value}</span>`;
+                marginShortSellList.appendChild(li);
+            });
+
+            // 顯示資券互抵和註記
+            offsettingValue.textContent = formatNumber(marginData.資券互抵) || '-';
+            noteValue.textContent = marginData.註記 || '-';
+            marginResultsArea.classList.remove('hidden'); // 顯示融資融券區塊
+        } else {
+             marginResultsArea.classList.add('hidden'); // 若無數據則隱藏
+        }
+
+        // 顯示重點指標數據
+        if (ratioData) {
+             dataFound = true; // 標記找到數據
+             stockName = ratioData.Name || stockName; // 更新股票名稱 (若融資融券沒有，這裡可能會有)
+             bwibbuStockNameHeader.textContent = `重點指標: ${stockCode} - ${stockName}`;
+             stockNameBwibbu.textContent = `${ratioData.Code || stockCode} - ${stockName}`; // 顯示代號和名稱
+             // 顯示各項比率，若 API 回傳 '-' 或無值，則顯示 'N/A'
+             peRatio.textContent = ratioData.PEratio && ratioData.PEratio !== '-' ? ratioData.PEratio : 'N/A';
+             dividendYield.textContent = ratioData.DividendYield && ratioData.DividendYield !== '-' ? ratioData.DividendYield : 'N/A';
+             pbRatio.textContent = ratioData.PBratio && ratioData.PBratio !== '-' ? ratioData.PBratio : 'N/A';
+             bwibbuResultsArea.classList.remove('hidden'); // 顯示重點指標區塊
+        } else {
+             bwibbuResultsArea.classList.add('hidden'); // 若無數據則隱藏
+        }
+
+        // 如果找到了任一數據 (融資券或指標)，則顯示整個 TWSE 數據包裝區塊和標題
+        if (dataFound) {
+            currentDataHeader.textContent = `最新指標與融資券: ${stockCode} - ${stockName} (上市股票)`;
+            twseDataWarning.classList.remove('hidden'); // 顯示提示文字
+            twseDataWrapper.classList.remove('hidden'); // 顯示包裝區塊
+        } else {
+            twseDataWrapper.classList.add('hidden'); // 否則隱藏
+             // 如果查詢的是 OTC 股票，給予提示
+             if (currentStockType === 'otc') {
+                 showMessage(`注意：股票代號 ${stockCode} 為上櫃(OTC)，不提供即時融資券與重點指標數據。`, 'warning');
+             }
+        }
+    }
+
+    /**
+     * 顯示歷史成交資料表格
+     * @param {object[]} data - 歷史成交數據陣列
+     * @param {string} stockCode - 股票代號
+     * @param {string} stockType - 股票類型 ('tse' 或 'otc')
+     */
+    function displayStockHistory(data, stockCode, stockType) {
+        historicalResultsArea.innerHTML = ''; // 清空舊內容
+        if (!data || data.length === 0) { // 如果沒有數據
+             // 顯示無數據提示
+             historicalResultsArea.innerHTML = `<h2 class="!mt-0">歷史成交資訊: ${stockCode}</h2><p class="p-4 text-gray-500">沒有找到 ${stockCode} (${stockType.toUpperCase()}) 在查詢區間內的歷史成交資料。</p>`;
+             historicalResultsArea.classList.remove('hidden'); // 顯示區塊
+             return; // 結束函數
+        }
+
+        // 創建標題
+        const heading = document.createElement('h2');
+        heading.className = "!mt-0"; // 移除區塊內第一個元素的上邊距
+        heading.textContent = `歷史成交資訊: ${stockCode} (${stockType.toUpperCase()} - ${data.length} 筆)`;
+        historicalResultsArea.appendChild(heading);
+
+        // 創建表格
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        // 定義表頭欄位 (保持 '股' 的單位標示)
+        const headers = ['日期', '開盤價', '最高價', '最低價', '收盤價', '成交量(股)'];
+        headers.forEach(header => { // 遍歷表頭，創建 th 元素
+            const th = document.createElement('th');
+            th.textContent = header;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // 創建表格主體
+        const tbody = document.createElement('tbody');
+        data.forEach((item, index) => { // 遍歷數據，創建 tr 元素
+            const row = document.createElement('tr');
+            // 設定隔行變色樣式
+            row.className = index % 2 === 0 ? 'bg-gray-50' : 'bg-white';
+
+            // 格式化顯示的數值，處理 0 或 NaN 的情況
+            const open = !isNaN(item.openPrice) && item.openPrice !== 0 ? item.openPrice.toFixed(2) : '-';
+            const high = !isNaN(item.highPrice) && item.highPrice !== 0 ? item.highPrice.toFixed(2) : '-';
+            const low = !isNaN(item.lowPrice) && item.lowPrice !== 0 ? item.lowPrice.toFixed(2) : '-';
+            const close = !isNaN(item.closePrice) && item.closePrice !== 0 ? item.closePrice.toFixed(2) : '-';
+            const volume = !isNaN(item.volume) ? item.volume.toLocaleString() : '-'; // 成交量加上千分位
+
+            // 填入表格儲存格內容
+            row.innerHTML = `
+                <td>${item.date || '-'}</td>
+                <td>${open}</td>
+                <td>${high}</td>
+                <td>${low}</td>
+                <td>${close}</td>
+                <td>${volume}</td>
+            `;
+            tbody.appendChild(row); // 加入表格主體
+        });
+        table.appendChild(tbody);
+        historicalResultsArea.appendChild(table); // 將表格加入顯示區
+        historicalResultsArea.classList.remove('hidden'); // 顯示歷史資料區塊
+    }
+
+     /**
+      * 顯示法人進出數據表格
+      * @param {object[]} data - 法人進出數據陣列 (已根據日期區間獲取)
+      */
+     function displayInstitutionalData(data) {
+        // 1. 清空所有舊的表格內容
+        dealerSelfBody.innerHTML = '';
+        dealerHedgingBody.innerHTML = '';
+        foreignInvestorBody.innerHTML = '';
+        investmentTrustBody.innerHTML = '';
+
+        // 2. 過濾掉 'Foreign_Dealer_Self' (外資自營商) 類型並按日期降冪排序
+        const filteredData = data
+            .filter(item => item.name !== 'Foreign_Dealer_Self')
+            .sort((a, b) => b.date.localeCompare(a.date)); // 按日期降冪
+
+        // 3. 追蹤每個表格是否有數據加入
+        let hasData = {
+            dealerSelf: false,
+            dealerHedging: false,
+            foreignInvestor: false,
+            investmentTrust: false
+        };
+
+        if (filteredData.length === 0) { // 如果過濾後沒有數據
+             console.log("過濾後無法人進出數據可顯示。");
+             // 隱藏所有法人相關表格和容器
+             dealerSelfTable.classList.add('hidden');
+             dealerHedgingTable.classList.add('hidden');
+             foreignInvestorTable.classList.add('hidden');
+             investmentTrustTable.classList.add('hidden');
+             institutionalDataContainer.classList.add('hidden');
+             institutionalDataWarning.classList.add('hidden');
+             return; // 結束函數
+         }
+
+        // 4. 遍歷過濾後的數據，將每一行加入對應的表格
+        filteredData.forEach((item, index) => {
+            // FinMind 的 buy/sell 單位是「張」
+            const buyShares = parseInt(item.buy) || 0;
+            const sellShares = parseInt(item.sell) || 0;
+            const netBuy = buyShares - sellShares; // 計算買賣超
+            // 根據買賣超正負決定文字顏色
+            const netBuyClass = netBuy > 0 ? 'text-red-600' : (netBuy < 0 ? 'text-green-600' : '');
+
+            // 產生表格行的 HTML
+            const rowHTML = `
+            <td class="py-2 px-4 border-b border-gray-200 text-sm">${item.date}</td>
+            <td class="py-2 px-4 border-b border-gray-200 text-sm text-right">${formatNumber(buyShares)}</td>
+            <td class="py-2 px-4 border-b border-gray-200 text-sm text-right">${formatNumber(sellShares)}</td>
+            <td class="py-2 px-4 border-b border-gray-200 text-sm text-right ${netBuyClass} font-semibold">${formatNumber(netBuy)}</td>
+            `;
+
+            const row = document.createElement('tr'); // 創建 tr 元素
+            row.className = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'; // 設定隔行變色
+            row.innerHTML = rowHTML; // 填入內容
+
+            // 根據法人名稱 (item.name) 將行加入對應表格的 tbody，並標記該表格有數據
+            switch (item.name) {
+                case 'Dealer_self': // 注意 FinMind 使用小寫 's'
+                    dealerSelfBody.appendChild(row);
+                    hasData.dealerSelf = true;
+                    break;
+                case 'Dealer_Hedging':
+                    dealerHedgingBody.appendChild(row);
+                    hasData.dealerHedging = true;
+                    break;
+                case 'Foreign_Investor': // 包含 QFII
+                    foreignInvestorBody.appendChild(row);
+                    hasData.foreignInvestor = true;
+                    break;
+                case 'Investment_Trust':
+                    investmentTrustBody.appendChild(row);
+                    hasData.investmentTrust = true;
+                    break;
+            }
+        });
+
+        // 5. 根據各表格是否有數據，決定是否顯示該表格
+        dealerSelfTable.classList.toggle('hidden', !hasData.dealerSelf);
+        dealerHedgingTable.classList.toggle('hidden', !hasData.dealerHedging);
+        foreignInvestorTable.classList.toggle('hidden', !hasData.foreignInvestor);
+        investmentTrustTable.classList.toggle('hidden', !hasData.investmentTrust);
+
+        // 6. 如果至少有一個表格是可見的，則顯示整個法人數據容器和提示文字
+         const isAnyTableVisible = hasData.dealerSelf || hasData.dealerHedging || hasData.foreignInvestor || hasData.investmentTrust;
+         institutionalDataContainer.classList.toggle('hidden', !isAnyTableVisible);
+         institutionalDataWarning.classList.toggle('hidden', !isAnyTableVisible);
+
+         // 可選：如果原始數據有但過濾後全沒了 (例如只有外資自營商)，顯示提示
+         if (!isAnyTableVisible && data.length > 0) {
+             showMessage("注意：查詢到的法人資料僅含外資自營商，已被過濾。", "warning");
+         }
+    }
+
+    // --- AI 分析函數 ---
+
+    /**
+     * 將所有獲取的數據格式化為適合 AI 分析的文字
+     * @param {object|null} marginData - 融資融券數據
+     * @param {object|null} ratioData - 重點指標數據
+     * @param {object[]} historyData - 歷史成交數據
+     * @param {object[]} institutionalData - 法人進出數據
+     * @returns {string} 格式化後的 Markdown 文字
+     */
+    function formatDataForAnalysis(marginData, ratioData, historyData, institutionalData) {
+        let analysisText = `## 股票代號: ${currentStockCode}\n`;
+        const { startDate, endDate } = calculateDateRange(currentDays); // 獲取查詢的日期區間用於上下文
+        analysisText += `查詢日期區間: ${startDate} to ${endDate} (${currentDays}日曆天)\n`;
+        analysisText += `股票類型: ${currentStockType.toUpperCase()}\n\n`;
+
+        // 格式化 最新數據 (融資券/重點指標)
+        analysisText += "### 最新數據 (融資券/重點指標 - 僅上市)\n\n";
+        if (marginData) { // 如果有融資融券數據
+            analysisText += `**融資融券 (${marginData.股票代號} - ${marginData.股票名稱 || ''}):**\n`;
+            analysisText += `- 融資餘額: ${formatNumber(marginData.融資今日餘額) || '-'} (前日: ${formatNumber(marginData.融資前日餘額) || '-'}, 限額: ${formatNumber(marginData.融資限額) || '-'}) \n`;
+            analysisText += `- 融券餘額: ${formatNumber(marginData.融券今日餘額) || '-'} (前日: ${formatNumber(marginData.融券前日餘額) || '-'}, 限額: ${formatNumber(marginData.融券限額) || '-'}) \n`;
+            analysisText += `- 資券互抵: ${formatNumber(marginData.資券互抵) || '-'} \n`;
+            analysisText += `- 註記: ${marginData.註記 || '-'} \n\n`;
+        } else {
+            analysisText += "**融資融券: 未取得資料或非上市股票**\n\n";
+        }
+         if (ratioData) { // 如果有重點指標數據
+            analysisText += `**重點指標 (${ratioData.Code} - ${ratioData.Name || ''}):**\n`;
+            analysisText += `- 本益比: ${ratioData.PEratio || 'N/A'}\n`;
+            analysisText += `- 殖利率 (%): ${ratioData.DividendYield || 'N/A'}\n`;
+            analysisText += `- 股價淨值比: ${ratioData.PBratio || 'N/A'}\n\n`;
+        } else {
+            analysisText += "**重點指標: 未取得資料或非上市股票**\n\n";
+        }
+
+        // 格式化 歷史成交資料
+        analysisText += `### 區間內 ${historyData ? historyData.length : 0} 筆歷史成交資料 (${currentStockType.toUpperCase()})\n\n`;
+        if (historyData && historyData.length > 0) {
+             // 數據應已按日期降冪排序
+            analysisText += '```\n'; // 使用 Markdown 程式碼區塊顯示表格
+            analysisText += '日期        開盤價   最高價   最低價   收盤價   成交量(股) \n';
+            historyData.forEach(item => { // 遍歷數據行
+                // 格式化數值並對齊
+                const open = (!isNaN(item.openPrice) && item.openPrice !== 0 ? item.openPrice.toFixed(2) : '-').padStart(8);
+                const high = (!isNaN(item.highPrice) && item.highPrice !== 0 ? item.highPrice.toFixed(2) : '-').padStart(8);
+                const low = (!isNaN(item.lowPrice) && item.lowPrice !== 0 ? item.lowPrice.toFixed(2) : '-').padStart(8);
+                const close = (!isNaN(item.closePrice) && item.closePrice !== 0 ? item.closePrice.toFixed(2) : '-').padStart(8);
+                const volume = (!isNaN(item.volume) ? item.volume.toLocaleString() : '-').padStart(12);
+                 analysisText += `${item.date} ${open} ${high} ${low} ${close} ${volume}\n`; // 組合行文字
+            });
+             analysisText += '```\n\n'; // 結束程式碼區塊
+        } else {
+            analysisText += "**歷史成交資料: 該區間內未取得或無資料**\n\n";
+        }
+
+        // 格式化 法人進出資料
+        analysisText += `### 區間內 ${institutionalData ? institutionalData.length : 0} 筆法人進出資料 (FinMind, 單位: 張)\n\n`;
+        if (institutionalData && institutionalData.length > 0) {
+             // 再次過濾和排序，並按日期分組以便於閱讀
+             const sortedFilteredInstitutions = institutionalData
+                .filter(item => item.name !== 'Foreign_Dealer_Self') // 過濾外資自營商
+                .sort((a, b) => b.date.localeCompare(a.date)); // 按日期降冪排序
+
+             // 按日期將買賣超數據匯總
+             const groupedByDate = sortedFilteredInstitutions.reduce((acc, item) => {
+                 const date = item.date;
+                 if (!acc[date]) { // 如果該日期還沒記錄，初始化
+                     acc[date] = { date: date, Dealer_self: 0, Dealer_Hedging: 0, Foreign_Investor: 0, Investment_Trust: 0, TotalBuy: 0, TotalSell: 0 };
+                 }
+                 const buyShares = parseInt(item.buy) || 0;
+                 const sellShares = parseInt(item.sell) || 0;
+                 const netBuy = buyShares - sellShares; // 計算淨買超
+                 if (item.name && acc[date].hasOwnProperty(item.name)) { // 累加到對應法人類型
+                     acc[date][item.name] += netBuy;
+                 }
+                 acc[date].TotalBuy += buyShares; // 累加總買入
+                 acc[date].TotalSell += sellShares; // 累加總賣出
+                 return acc;
+             }, {});
+
+             analysisText += '```\n'; // 開始程式碼區塊
+             analysisText += '日期        自營(自) 自營(避) 外資     投信     總買超   總賣超\n'; // 表頭
+             // 遍歷分組後的每日數據 (按日期降冪顯示)
+             Object.keys(groupedByDate).sort((a,b) => b.localeCompare(a)).forEach(date => {
+                 const dayData = groupedByDate[date];
+                 // 格式化並對齊各欄位數值
+                 const ds = (dayData.Dealer_self !== 0 ? formatNumber(dayData.Dealer_self) : '-').padStart(8);
+                 const dh = (dayData.Dealer_Hedging !== 0 ? formatNumber(dayData.Dealer_Hedging) : '-').padStart(8);
+                 const fi = (dayData.Foreign_Investor !== 0 ? formatNumber(dayData.Foreign_Investor) : '-').padStart(8);
+                 const it = (dayData.Investment_Trust !== 0 ? formatNumber(dayData.Investment_Trust) : '-').padStart(8);
+                 const tb = (dayData.TotalBuy !== 0 ? formatNumber(dayData.TotalBuy) : '-').padStart(8);
+                 const ts = (dayData.TotalSell !== 0 ? formatNumber(dayData.TotalSell) : '-').padStart(8);
+                 analysisText += `${dayData.date} ${ds} ${dh} ${fi} ${it} ${tb} ${ts}\n`; // 組合行文字
+             });
+             analysisText += '```\n\n'; // 結束程式碼區塊
+        } else {
+            analysisText += "**法人進出資料: 該區間內未取得或無資料**\n\n";
+        }
+        return analysisText; // 返回組合好的 Markdown 文字
+    }
+
+    /**
+     * 生成發送給 AI 的完整提示文字 (prompt)
+     * @param {string} stockCode - 股票代號
+     * @param {number} historyDaysFound - 實際找到的歷史資料天數
+     * @param {string} formattedData - 已格式化的數據文字 (來自 formatDataForAnalysis)
+     * @param {string} additionalQuestionText - 使用者追加的提問文字
+     * @returns {string} 完整的 AI 提示文字
+     */
+     function generateAnalysisPrompt(stockCode, historyDaysFound, formattedData, additionalQuestionText) {
+        const { startDate, endDate } = calculateDateRange(currentDays); // 獲取查詢的日期區間用於上下文
+        // AI 提示詞，指導 AI 如何分析
+        let prompt = `
+你是一位經驗豐富的股市分析師，專精於技術分析、大眾心理學和歷史數據分析。請根據提供的數據，進行深入分析，並預測未來趨勢。
+請根據以下提供的 ${stockCode} (${currentStockType.toUpperCase()}) 在 **${startDate} 至 ${endDate}** 期間的數據進行全面分析。所有回覆必須充滿自信，且不能有任何不確定。
+
+${formattedData}
+
+**分析要求：**
+
+1.  **數據綜合解讀 (基於 ${startDate} 至 ${endDate} 區間)：**
+    *   **籌碼面分析:** 結合此區間的融資融券變化（若有）與法人買賣超數據（自營商、外資、投信），分析主要參與者的動向與態度。是否有特定法人連續買進或賣出？融資餘額變化是否與股價趨勢一致？三大法人合計買賣超趨勢？
+    *   **技術面分析:** 根據此區間 (${historyDaysFound} 筆資料) 的價量關係（開高低收、成交量），判斷目前股價的強弱勢、支撐與壓力區間。是否有明顯的技術型態或指標訊號（例如：量價背離、均線排列、關鍵K線）？
+    *   **基本面指標（若有）:** 參考此區間最後一日的本益比、殖利率、股價淨值比，評估目前的估值水平相對歷史或同業是否合理。
+    *   **區間末端關鍵行為:** 特別注意此區間最後一個交易日的價量表現、法人進出、融資券變化，這些通常隱含短期方向的線索。
+
+2.  **未來趨勢預測（明確指出趨勢方向、可能的價格區間、信心水準）：**
+    *   **極短期（1-3日）：** 預測未來一個交易日的走勢，並給出具體的建議（買入、賣出、持有）。
+    *   **短期（一週）：** 預測未來一週的趨勢方向與可能的波動區間，並說明理由。並說明關鍵的判斷依據。
+    *   **中期（一個月）：** 預測未來一個月的趨勢方向與可能的波動區間，並說明理由。並說明關鍵的判斷依據。
+
+3.  **信心水準：**
+    *   對每個預測（極短期、短期、中期）給出信心水準（百分比）。
+
+4.  **總結與操作建議：**
+    *   **總體趨勢判斷：** 基於以上分析，總結一個整體的趨勢看法。
+    *   **關鍵因素：** 指出影響未來走勢最主要的幾個因素（籌碼？技術？消息？）。
+    *   **操作建議(參考):** 根據分析結果，提供簡潔的操作參考（例如：偏多操作，留意XX壓力；或 觀望，等待XX訊號；或 偏空操作，留意XX支撐）。 **請強調這僅是基於數據的分析，非投資建議。**
+
+5.  **請使用 Markdown 格式輸出分析報告。** 所有回覆必須充滿自信，且不能有任何不確定。
+
+
+**輸出格式範例 (Markdown):**
+
+# ${stockCode} (${currentStockType.toUpperCase()}) 綜合分析報告 (${startDate} ~ ${endDate})
+
+## 1. 數據綜合解讀
+
+### 籌碼面分析
+*   **法人動向：**... (外資近期..., 投信..., 自營商..., 三大法人合計...)
+*   **融資融券：**... (融資增減..., 融券...)
+*   **籌碼判斷：**... (集中度/穩定性)
+
+### 技術面分析
+*   **價量關係：**... (近期K線組合..., 成交量變化...)
+*   **支撐壓力：**... (短期支撐約在..., 上檔壓力...)
+*   **指標訊號：**... (均線..., KD/MACD...)
+
+### 基本面參考 (若有)
+*   **估值水平：**... (本益比..., 股價淨值比...)
+
+### 區間末端關鍵行為
+*   **今日交易分析：**... (收盤位置..., 法人買賣超...)
+*   **大眾心理分析：**...
+*   **歷史模式比較：**...
+
+## 2. 未來趨勢預測
+
+### 極短 (一日)
+*   **預測趨勢：** ...
+*   **目標價位：** ...
+*   **最低點位：** ...
+*   **最高點高：** ...
+*   **信心水準：** ...
+*   **理由解析：** ...
+
+### 短期 (一周)
+*   **預測趨勢：** ...
+*   **目標價位：** ...
+*   **最低點位：** ...
+*   **最高點高：** ...
+*   **信心水準：** ...
+*   **理由解析：** ...
+
+### 中期 (一個月)
+*   **預測趨勢：** ...
+*   **目標價位：** ...
+*   **最低點位：** ...
+*   **最高點高：** ...
+*   **信心水準：** ...
+*   **理由解析：** ...
+
+## 3. 總結趨勢
+*   **整體趨勢：** ... (上漲/下跌/盤整) ...
+*   **總體變動：** ... (先+/- X%，後+/- X%) ...
+*   **多方狀況：** ... (加碼/減碼/空手) ...
+*   **空方狀況：** ... (加碼/減碼/空手) ...
+
+---
+`; // 基礎提示詞結束
+
+            // 如果有追加提問，附加到提示詞末尾
+            if (additionalQuestionText) {
+                prompt += `\n\n**使用者追加提問：**\n${additionalQuestionText}\n\n**針對追加提問的回覆：**\n`;
+            }
+
+            return prompt; // 返回完整的提示文字
+     }
+
+    /**
+     * 呼叫 Google Gemini API 進行分析
+     * @param {string} prompt - 要發送給 AI 的提示文字
+     */
+    async function analyzeWithAI(prompt) {
+        analysisLoading.classList.remove('hidden'); // 顯示 AI 載入中
+        analysisOutput.classList.add('hidden');     // 隱藏舊的 AI 輸出
+        analysisOutput.innerHTML = '';              // 清空舊的 AI 輸出內容
+        analysisBtn.disabled = true;                // 禁用 AI 分析按鈕
+
+         // 再次檢查 API Key 是否有效
+         if (GEMINI_API_KEY.startsWith("AIza") && GEMINI_API_KEY.length < 20) {
+            showMessage("錯誤：未設定有效的 Google AI API 金鑰，無法進行分析。", "error");
+            analysisLoading.classList.add('hidden'); // 隱藏載入中
+            analysisBtn.disabled = false;            // 啟用按鈕
+            return; // 停止分析
+        }
+
+        console.log("正在發送提示到 Gemini API...");
+        // console.log("提示內容:", prompt); // 可選：取消註解以在控制台查看完整提示
+
+        try {
+            // 發送 POST 請求到 Gemini API
+            const response = await fetch(GEMINI_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }], // 將提示文字包裝在請求體中
+                     generationConfig: { // 可選：生成設定
+                         temperature: 0.3, // 溫度，控制創意程度 (較低=較保守)
+                         maxOutputTokens: 99999 // 最大輸出 token 數 (允許較長的回應)
+                    },
+                    // safetySettings: [ // 可選：調整安全設定 (若遇到內容被阻擋)
+                    //     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    //     // ... 其他安全類別設定 ...
+                    // ]
+                })
+            });
+
+            if (!response.ok) { // 如果 HTTP 狀態碼非 2xx
+                 const errorData = await response.json().catch(() => null); // 嘗試解析錯誤回應體
+                 console.error("AI API 錯誤回應:", errorData);
+                 let errorMsg = `AI API請求失敗: ${response.status} ${response.statusText}`;
+                 if (errorData && errorData.error && errorData.error.message) {
+                     errorMsg += ` - ${errorData.error.message}`; // 附加 API 返回的錯誤訊息
+                 } else if (errorData) {
+                     errorMsg += ` - ${JSON.stringify(errorData)}`; // 附加原始錯誤物件
+                 }
+                 throw new Error(errorMsg); // 拋出包含詳細資訊的錯誤
+             }
+
+            const result = await response.json(); // 解析成功的 JSON 回應
+
+            console.log("Gemini API 回應:", result); // 在控制台記錄完整回應
+
+            // 檢查 Gemini API 回應結構是否符合預期
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0)
+            {
+                // 提取生成的文字內容
+                const generatedText = result.candidates[0].content.parts[0].text;
+                // 使用 marked.js 將 Markdown 轉為 HTML
+                analysisOutput.innerHTML = marked.parse(generatedText);
+                analysisOutput.classList.remove('hidden'); // 顯示 AI 分析結果區塊
+            } else {
+                // 處理 API 未返回有效內容的情況 (例如被安全機制阻擋)
+                let reason = "未知原因，API 未返回有效內容";
+                if (result.candidates && result.candidates[0]?.finishReason) { // 檢查是否有終止原因
+                    reason = `分析終止: ${result.candidates[0].finishReason}`;
+                     if (result.candidates[0].safetyRatings) { // 檢查是否有安全評級訊息
+                         const harmfulRatings = result.candidates[0].safetyRatings.filter(r => r.probability !== 'NEGLIGIBLE');
+                         if (harmfulRatings.length > 0) {
+                            reason += ` (觸發安全機制: ${harmfulRatings.map(r=>r.category).join(', ')})`;
+                         }
+                     }
+                } else if (result.promptFeedback?.blockReason) { // 檢查是否是輸入提示被阻擋
+                     reason = `輸入內容被阻擋: ${result.promptFeedback.blockReason}`;
+                }
+                console.error("AI 分析失敗:", reason, result);
+                throw new Error(`AI 分析失敗 (${reason})`); // 拋出包含原因的錯誤
+            }
+        } catch (err) { // 捕獲 fetch 或處理過程中的錯誤
+            console.error('AI 分析過程中出錯:', err);
+            showMessage(`AI 分析失敗: ${err.message}`, "error"); // 在通用訊息區顯示錯誤
+             analysisOutput.innerHTML = `<p class="text-red-600">AI 分析無法完成，請檢查瀏覽器控制台錯誤訊息或 API 金鑰設定。</p>`; // 在 AI 輸出區也顯示錯誤提示
+             analysisOutput.classList.remove('hidden'); // 顯示 AI 輸出區的錯誤
+        } finally { // 無論成功或失敗，最終都會執行
+            analysisLoading.classList.add('hidden'); // 隱藏 AI 載入中
+            analysisBtn.disabled = false; // 重新啟用 AI 分析按鈕
+        }
+    }
+
+    // --- 事件處理函數 ---
+
+    /**
+     * 處理查詢按鈕點擊或表單提交事件
+     * @param {Event} event - 事件物件
+     */
+    async function handleSearch(event) {
+        event.preventDefault(); // 阻止表單預設的提交行為
+        // 獲取使用者輸入
+        currentStockCode = stockCodeInput.value.trim();
+        currentStockType = stockTypeSelect.value;
+        currentDays = parseInt(daysInput.value) || 10; // 若無效則預設 10 天
+
+        // 驗證輸入
+        if (!currentStockCode) {
+            showError("請輸入股票代號");
+            return;
+        }
+        if (isNaN(currentDays) || currentDays < 1 || currentDays > 365) {
+            showError("查詢天數必須在 1 到 365 之間");
+             daysInput.value = 10; // 重設為預設值
+             currentDays = 10;
+             updateDateRange(); // 更新日期預覽
+            return;
+        }
+
+        setLoadingState(true); // 進入載入狀態 (會清除舊數據)
+        // 重設全域數據變數
+        currentMarginData = null;
+        currentRatioData = null;
+        stockHistoryData = null;
+        institutionalData = null;
+
+        let allErrors = []; // 收集所有 API 的錯誤訊息
+        let dataFetched = { // 標記各類數據是否成功獲取
+             margin: false, ratio: false, history: false, institutional: false
+        };
+
+        // 根據使用者輸入的天數計算查詢的日期區間
+        const { startDate, endDate } = calculateDateRange(currentDays);
+        console.log(`統一查詢日期區間: ${startDate} 到 ${endDate}`);
+
+        try {
+             // 使用 Promise.allSettled 同時發起所有數據請求
+             const results = await Promise.allSettled([
+                 fetchInstitutionalData(currentStockCode, startDate, endDate),          // 0: 法人進出 (使用日期區間)
+                 fetchCurrentDataTWSE(currentStockCode),                                 // 1: 融資券/指標 (查詢當前)
+                 fetchHistoricalData(currentStockCode, currentStockType, startDate, endDate) // 2: 歷史成交 (使用日期區間)
+             ]);
+
+             console.log("所有資料查詢完成:", results);
+
+             // --- 逐步處理各 API 的回應結果 ---
+
+             // 處理 法人進出 數據 (結果索引 0)
+             if (results[0].status === 'fulfilled') { // 請求成功完成
+                 institutionalData = results[0].value.institutionalData; // 直接儲存數據
+                 allErrors.push(...results[0].value.errors); // 合併錯誤訊息
+                 if (institutionalData && institutionalData.length > 0) dataFetched.institutional = true; // 標記成功獲取
+             } else { // 請求失敗
+                  console.error("法人進出資料查詢失敗:", results[0].reason);
+                  allErrors.push(`法人資料查詢失敗: ${results[0].reason.message}`);
+             }
+
+             // 處理 融資券/指標 數據 (結果索引 1)
+             if (results[1].status === 'fulfilled') {
+                currentMarginData = results[1].value.marginData;
+                currentRatioData = results[1].value.ratioData;
+                allErrors.push(...results[1].value.errors);
+                if (currentMarginData) dataFetched.margin = true;
+                if (currentRatioData) dataFetched.ratio = true;
+             } else {
+                  console.error("融資券/指標資料查詢失敗:", results[1].reason);
+                  allErrors.push(`融資券/指標查詢失敗: ${results[1].reason.message}`);
+             }
+
+             // 處理 歷史成交 數據 (結果索引 2)
+             if (results[2].status === 'fulfilled') {
+                 stockHistoryData = results[2].value.historyData; // 直接儲存數據
+                 allErrors.push(...results[2].value.errors);
+                  if (stockHistoryData && stockHistoryData.length > 0) dataFetched.history = true;
+             } else {
+                  console.error("歷史成交資料查詢失敗:", results[2].reason);
+                  allErrors.push(`歷史成交價量查詢失敗: ${results[2].reason.message}`);
+             }
+
+             // --- 顯示結果 ---
+             setLoadingState(false); // 結束載入狀態
+
+             // 根據 dataFetched 標記決定是否呼叫顯示函數
+             if (dataFetched.margin || dataFetched.ratio) {
+                 displayMarginRatioData(currentMarginData, currentRatioData, currentStockCode);
+             } else {
+                  twseDataWrapper.classList.add('hidden'); // 確保 TWSE 區塊是隱藏的
+             }
+
+             if (dataFetched.institutional) {
+                 displayInstitutionalData(institutionalData); // 直接顯示獲取的法人數據
+             } else {
+                 institutionalDataContainer.classList.add('hidden'); // 確保法人區塊是隱藏的
+             }
+
+             if (dataFetched.history) {
+                 displayStockHistory(stockHistoryData, currentStockCode, currentStockType); // 直接顯示獲取的歷史數據
+             } else {
+                  historicalResultsArea.classList.add('hidden'); // 確保歷史區塊是隱藏的
+                   // 如果歷史資料查詢明確失敗，顯示提示
+                   if (results[2].status !== 'fulfilled') {
+                        historicalResultsArea.innerHTML = `<h2 class="!mt-0">歷史成交資訊: ${stockCode}</h2><p class="p-4 text-red-500">查詢 ${currentStockCode} (${currentStockType.toUpperCase()}) 的歷史成交資料失敗。</p>`;
+                        historicalResultsArea.classList.remove('hidden');
+                   }
+             }
+
+
+            // --- 處理整體狀態 (是否有任何數據成功顯示) ---
+            const anyDataDisplayed = dataFetched.margin || dataFetched.ratio || dataFetched.institutional || dataFetched.history;
+
+            if (anyDataDisplayed) { // 如果至少顯示了一種數據
+                dataDisplayContainer.classList.remove('hidden'); // 顯示主數據容器
+                aiInteractionContainer.classList.remove('hidden'); // 顯示 AI 互動區塊
+                 if (allErrors.length > 0) { // 如果有錯誤訊息
+                     showMessage(`查詢完成，但部分資料查詢出現 ${allErrors.length} 個問題:\n- ${allErrors.join('\n- ')}`, "warning");
+                 } else { // 如果一切順利
+                     messageArea.classList.add('hidden'); // 隱藏訊息區
+                 }
+                 // 更新頁腳顯示查詢狀態
+                 const actualHistoryCount = stockHistoryData ? stockHistoryData.length : 0;
+                 // 計算法人資料的獨立天數 (可選，稍微複雜)
+                 const uniqueInstiDates = institutionalData ? new Set(institutionalData.map(item => item.date)).size : 0;
+                 footerInfo.textContent = `資料來源: FinMind, TWSE, TPEx, Google AI | 股票: ${currentStockCode} | 查詢區間: ${startDate} 至 ${endDate} (${currentDays}日曆天) | 顯示 ${actualHistoryCount} 筆歷史資料, ${uniqueInstiDates} 天法人資料`;
+
+            } else { // 如果沒有任何數據成功顯示
+                dataDisplayContainer.classList.add('hidden'); // 保持主容器隱藏
+                aiInteractionContainer.classList.add('hidden'); // 隱藏 AI 區塊
+                if (allErrors.length > 0) { // 如果是因為錯誤導致沒數據
+                     showError(`所有資料查詢均失敗或無資料:\n- ${allErrors.join('\n- ')}`);
+                } else { // 如果是 API 本身就返回無數據
+                     noDataMessage.textContent = `在 ${startDate} 至 ${endDate} 區間內，找不到股票 ${currentStockCode} 的任何相關資料。請檢查代碼或日期範圍。`;
+                     noDataMessage.classList.remove('hidden');
+                }
+                 // 更新頁腳顯示查詢失敗或無資料
+                 footerInfo.textContent = `資料來源: FinMind, TWSE, TPEx, Google AI | 股票: ${currentStockCode} | 查詢失敗或無資料`;
+            }
+
+
+        } catch (error) { // 捕獲 Promise.allSettled 本身或後續處理的意外錯誤
+            console.error("總體查詢處理錯誤:", error);
+            setLoadingState(false); // 結束載入狀態
+            showError(`處理查詢時發生嚴重錯誤: ${error.message}`); // 顯示嚴重錯誤
+            // 更新頁腳
+            footerInfo.textContent = `資料來源: FinMind, TWSE, TPEx, Google AI | 股票: ${currentStockCode} | 查詢失敗`;
+        }
+    }
+
+    /**
+     * 處理 AI 分析按鈕點擊事件
+     */
+    function handleAnalysisClick() {
+        // 檢查是否有任何可用於分析的數據
+        const hasAnyData = currentMarginData || currentRatioData || (stockHistoryData && stockHistoryData.length > 0) || (institutionalData && institutionalData.length > 0);
+
+        if (!hasAnyData) { // 如果完全沒有數據
+            showMessage('沒有足夠的資料可供 AI 分析。請先成功查詢資料。', 'error');
+            return;
+        }
+
+         // 最後檢查一次 API Key
+         if (GEMINI_API_KEY.startsWith("AIza") && GEMINI_API_KEY.length < 20) {
+            showMessage("錯誤：未設定有效的 Google AI API 金鑰，無法進行分析。", "error");
+            return;
+        }
+
+
+        const additionalQuestionText = additionalQuestion.value.trim(); // 獲取追加提問文字
+        // 將所有獲取的數據傳遞給格式化函數
+        const formattedData = formatDataForAnalysis(currentMarginData, currentRatioData, stockHistoryData, institutionalData);
+        // 計算實際找到的歷史數據筆數，用於提示詞
+        const historyDaysFound = stockHistoryData ? stockHistoryData.length : 0;
+        // 生成 AI 提示文字
+        const prompt = generateAnalysisPrompt(currentStockCode, historyDaysFound, formattedData, additionalQuestionText);
+
+        // 呼叫 AI 分析函數 (該函數會處理自己的載入狀態)
+        analyzeWithAI(prompt);
+    }
+
+</script>
+</body>
+</html>
