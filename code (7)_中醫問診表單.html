@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中醫體質與症狀問卷 (AI 分析版 v3.1)</title>
+    <style>
+        /* --- Previous styles adjusted --- */
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif; line-height: 1.6; padding: 15px; background-color: #f4f7f6; -webkit-text-size-adjust: 100%; /* Prevent font scaling on iOS */ }
+        h1 { text-align: center; color: #2c3e50; font-size: 1.6em; margin-bottom: 15px; }
+        fieldset { margin-bottom: 20px; border: 1px solid #bdc3c7; padding: 15px; border-radius: 8px; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        legend { font-weight: bold; font-size: 1.3em; color: #34495e; padding: 0 10px; margin-bottom: 10px; }
+
+        label.question-label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; font-size: 1.05em; }
+        label:not(.question-label) { display: block; margin-bottom: 5px; font-weight: 500; color: #444; }
+
+        input[type="text"], input[type="number"], input[type="date"], textarea { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; /* iOS default zoom fix */ background-color: #fff; -webkit-appearance: none; /* Remove iOS default styling */ appearance: none; }
+        textarea { min-height: 80px; resize: vertical; }
+        input[type="date"] { min-height: 44px; /* Ensure tappable height */ } /* iOS date input height */
+
+        .radio-group, .checkbox-group { margin-bottom: 5px; padding-left: 5px; }
+        .radio-group label, .checkbox-group label { display: inline-block; margin-right: 15px; margin-bottom: 8px; /* Slightly more space */ font-weight: normal; color: #555; vertical-align: middle; cursor: pointer; padding: 5px 0; /* Add vertical padding for easier tapping */ }
+        .radio-group input[type="radio"], .checkbox-group input[type="checkbox"] { margin-right: 8px; /* More space */ vertical-align: middle; cursor: pointer; width: 1.2em; height: 1.2em; /* Slightly larger */ }
+
+        .notes-input { display: block; width: 95%; padding: 8px 10px; margin-top: 5px; margin-bottom: 10px; margin-left: 5px; border: 1px solid #dcdcdc; border-radius: 4px; font-size: 0.95em; box-sizing: border-box; background-color: #fafafa; -webkit-appearance: none; appearance: none; }
+
+        #vaccine_details_container { display: none; margin-left: 0; margin-top: 5px; }
+        #vaccine_details_input { margin-top: 5px; }
+
+        button { display: block; width: 100%; padding: 14px 20px; /* Larger padding */ color: white; border: none; border-radius: 8px; /* More rounded */ font-size: 1.15em; cursor: pointer; margin-top: 15px; transition: background-color 0.2s ease; -webkit-appearance: none; appearance: none; }
+        button#confirmButton { background-color: #27ae60; }
+        button#confirmButton:hover { background-color: #229954; }
+        button#submitAiButton { background-color: #3498db; display: none; margin-top: 25px; }
+        button#submitAiButton:hover { background-color: #2980b9; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; opacity: 0.7; }
+
+        .help-text { font-size: 0.9em; color: #7f8c8d; margin-bottom: 10px; }
+        #bmi_display { margin-top: 5px; margin-bottom: 15px; font-weight: bold; color: #2980b9; }
+
+        /* --- Summary & AI Output Styles --- */
+        #summaryOutput, #aiResponseOutput { margin-top: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #f9f9f9; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
+        #summaryOutput { display: none; }
+        #aiResponseOutput { display: none; min-height: 50px; }
+
+        #summaryOutput h2, #aiResponseOutput h2 { margin-top: 0; color: #34495e; font-size: 1.3em; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 15px; }
+
+        /* Styles for Formatted AI Response */
+        #aiResponseOutput h3 { font-size: 1.2em; color: #2c3e50; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; }
+         #aiResponseOutput h4 { font-size: 1.1em; color: #34495e; margin-top: 12px; margin-bottom: 5px; }
+        #aiResponseOutput p { margin: 8px 0; line-height: 1.6; color: #333;}
+        #aiResponseOutput strong { font-weight: bold; color: #000; }
+        #aiResponseOutput ul, #aiResponseOutput ol { margin-left: 20px; margin-top: 5px; margin-bottom: 10px; padding-left: 15px; }
+        #aiResponseOutput li { margin-bottom: 5px; }
+         #aiResponseOutput ul li::before { content: "• "; color: #3498db; font-weight: bold; display: inline-block; width: 1em; margin-left: -1em; }
+         #aiResponseOutput ol { list-style-type: decimal; }
+
+
+        #summaryOutput strong { color: #333; display: inline-block; margin-right: 5px; }
+        #summaryOutput ul { list-style-type: none; padding-left: 15px; margin-top: 3px; margin-bottom: 8px; }
+        #summaryOutput li::before { content: "✓ "; color: #27ae60; margin-right: 5px; }
+        #summaryOutput fieldset { padding: 10px 15px; margin-bottom: 15px; background-color: #fff; }
+        #summaryOutput legend { font-size: 1.1em; margin-bottom: 10px; }
+        #summaryOutput .notes { font-style: italic; color: #777; margin-left: 15px; margin-top: 0px; font-size: 0.95em; }
+
+        #aiResponseOutput .loading { text-align: center; color: #777; font-style: italic; padding: 20px; }
+        #aiResponseOutput .error { color: #e74c3c; font-weight: bold; padding: 15px; }
+        /* Removed text from disclaimer, but kept the class for structure if needed later */
+        .ai-disclaimer { font-size: 0.85em; color: #e74c3c; text-align: center; margin-top: 15px; padding: 10px; border-top: 1px solid #f0e0e0; font-weight: bold; min-height: 1.2em; /* Ensure space even if empty */ }
+        /* --- End Styles --- */
+
+    </style>
+</head>
+<body>
+
+    <h1>中醫體質與症狀問卷</h1>
+    <p class="help-text" style="text-align: center;">請仔細填寫以下資訊。本問卷僅供參考，不能取代專業診斷。</p>
+
+    <form id="tcmForm" action="javascript:void(0);">
+
+        <!-- Fieldsets for Basic Info, Chief Complaint, Inquiry Info -->
+        <!-- ... (HTML structure for questions remains the same as previous version) ... -->
+         <fieldset>
+            <legend>【基本資訊】</legend>
+            <label for="name" class="question-label">1. 姓名：</label>
+            <input type="text" id="name" name="name" required>
+            <label class="question-label">2. 性別：</label>
+            <div class="radio-group"> <label for="gender_male"><input type="radio" id="gender_male" name="gender" value="男" required> 男</label> <label for="gender_female"><input type="radio" id="gender_female" name="gender" value="女"> 女</label> </div>
+            <label for="age" class="question-label">3. 年齡：</label>
+            <input type="number" id="age" name="age" min="0" max="150">
+            <label for="height" class="question-label">4. 身高 (cm)：</label>
+            <input type="number" id="height" name="height" min="0" oninput="calculateBmi()">
+            <label for="weight" class="question-label">5. 體重 (kg)：</label>
+            <input type="number" id="weight" name="weight" min="0" step="0.1" oninput="calculateBmi()">
+            <p id="bmi_display">您的 BMI 值：<span id="bmi_value">--</span></p>
+            <label class="question-label">6. 體型 (自動判斷)：</label>
+            <div class="radio-group"> <label><input type="radio" name="body_type" value="瘦" id="body_type_thin_severe"> 瘦</label> <label><input type="radio" name="body_type" value="偏瘦" id="body_type_thin"> 偏瘦</label> <label><input type="radio" name="body_type" value="標準" id="body_type_normal"> 標準</label> <label><input type="radio" name="body_type" value="偏胖" id="body_type_overweight"> 偏胖</label> <label><input type="radio" name="body_type" value="肥胖" id="body_type_obese"> 肥胖</label> </div>
+            <label class="question-label">7. 近兩年接種疫苗：</label>
+            <div class="radio-group"> <label><input type="radio" id="vaccine_no" name="vaccine_status" value="無" onclick="toggleVaccineDetails(false)" required> 無</label> <label><input type="radio" id="vaccine_yes" name="vaccine_status" value="有" onclick="toggleVaccineDetails(true)"> 有</label> </div>
+            <div id="vaccine_details_container"> <label for="vaccine_details_input">請詳述疫苗種類、劑次、時間等：</label> <textarea id="vaccine_details_input" name="vaccine_details"></textarea> </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>【主訴】</legend>
+            <label for="main_complaint" class="question-label">1. 主要不適症狀：</label>
+            <textarea id="main_complaint" name="main_complaint" rows="4" placeholder="請盡量詳細描述最困擾您的問題"></textarea>
+            <label for="symptom_start_date" class="question-label">2. 症狀開始時間：</label>
+            <input type="date" id="symptom_start_date" name="symptom_start_date">
+            <label for="treatment_history" class="question-label">3. 接受過哪些治療方式及效果：</label>
+            <textarea id="treatment_history" name="treatment_history" rows="4" placeholder="例如：西藥、中藥、針灸、物理治療等及其效果"></textarea>
+        </fieldset>
+
+        <fieldset>
+            <legend>【問診資訊】</legend>
+            <p class="help-text">請勾選所有符合您目前情況的選項，並可在下方補充說明。</p>
+
+            <label class="question-label">1. 精神：</label>
+            <div class="checkbox-group" data-notes-id="spirit_notes"> <label><input type="checkbox" name="spirit" value="總是疲倦"> 總是疲倦</label> <label><input type="checkbox" name="spirit" value="好"> 好</label> <label><input type="checkbox" name="spirit" value="飯後疲倦"> 飯後疲倦</label> <label><input type="checkbox" name="spirit" value="嗜睡"> 嗜睡</label> </div>
+            <input type="text" id="spirit_notes" name="spirit_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">2. 睡眠：</label>
+            <div class="checkbox-group" data-notes-id="sleep_notes"> <label><input type="checkbox" name="sleep" value="失眠"> 失眠</label> <label><input type="checkbox" name="sleep" value="多夢"> 多夢</label> <label><input type="checkbox" name="sleep" value="半夜醒了不易再入睡"> 半夜醒了不易再入睡</label> <label><input type="checkbox" name="sleep" value="淺眠"> 淺眠</label> <label><input type="checkbox" name="sleep" value="日夜顛倒"> 日夜顛倒</label> </div>
+             <input type="text" id="sleep_notes" name="sleep_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">3. 頭部：</label>
+            <div class="checkbox-group" data-notes-id="head_notes"> <label><input type="checkbox" name="head" value="暈眩"> 暈眩</label> <label><input type="checkbox" name="head" value="痛在兩側"> 痛在兩側</label> <label><input type="checkbox" name="head" value="痛在後腦勺"> 痛在後腦勺</label> <label><input type="checkbox" name="head" value="前額痛"> 前額痛</label> <label><input type="checkbox" name="head" value="頭頂痛"> 頭頂痛</label> <label><input type="checkbox" name="head" value="耳鳴（蟬鳴）"> 耳鳴（蟬鳴）</label> <label><input type="checkbox" name="head" value="耳鳴（轟鳴）"> 耳鳴（轟鳴）</label> </div>
+            <input type="text" id="head_notes" name="head_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">4. 頭皮 / 頭髮：</label>
+            <div class="checkbox-group" data-notes-id="scalp_hair_notes"> <label><input type="checkbox" name="scalp_hair" value="頭皮易出油"> 頭皮易出油</label> <label><input type="checkbox" name="scalp_hair" value="頭皮屑較多"> 頭皮屑較多</label> <label><input type="checkbox" name="scalp_hair" value="頭皮乾癢"> 頭皮乾癢</label> <label><input type="checkbox" name="scalp_hair" value="髮質粗糙乾燥"> 髮質粗糙乾燥</label> <label><input type="checkbox" name="scalp_hair" value="易掉髮"> 易掉髮</label> <label><input type="checkbox" name="scalp_hair" value="白髮"> 白髮</label> </div>
+             <input type="text" id="scalp_hair_notes" name="scalp_hair_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">5. 眼睛：</label>
+            <div class="checkbox-group" data-notes-id="eyes_notes"> <label><input type="checkbox" name="eyes" value="眼白有血絲"> 眼白有血絲</label> <label><input type="checkbox" name="eyes" value="眼白發黃"> 眼白發黃</label> <label><input type="checkbox" name="eyes" value="乾澀"> 乾澀</label> <label><input type="checkbox" name="eyes" value="有霧"> 有霧</label> <label><input type="checkbox" name="eyes" value="易癢"> 易癢</label> <label><input type="checkbox" name="eyes" value="疼痛"> 疼痛</label> <label><input type="checkbox" name="eyes" value="易流淚"> 易流淚</label> <label><input type="checkbox" name="eyes" value="視力下降"> 視力下降</label> <label><input type="checkbox" name="eyes" value="畏光"> 畏光</label> </div>
+            <input type="text" id="eyes_notes" name="eyes_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">6. 口腔：</label>
+            <div class="checkbox-group" data-notes-id="oral_notes"> <label><input type="checkbox" name="oral" value="口渴且喝很多水"> 口渴且喝很多水</label> <label><input type="checkbox" name="oral" value="口渴但不想喝水"> 口渴但不想喝水</label> <label><input type="checkbox" name="oral" value="口乾唇乾"> 口乾唇乾</label> <label><input type="checkbox" name="oral" value="早上口苦"> 早上口苦</label> <label><input type="checkbox" name="oral" value="經常口苦"> 經常口苦</label> <label><input type="checkbox" name="oral" value="經常口臭"> 經常口臭</label> <label><input type="checkbox" name="oral" value="口中黏膩"> 口中黏膩</label> <label><input type="checkbox" name="oral" value="口腔潰瘍"> 口腔潰瘍</label> <label><input type="checkbox" name="oral" value="嘴唇皰疹"> 嘴唇皰疹</label> <label><input type="checkbox" name="oral" value="牙齦腫脹"> 牙齦腫脹/易出血</label> <label><input type="checkbox" name="oral" value="蛀牙"> 蛀牙</label> <label><input type="checkbox" name="oral" value="牙周炎"> 牙周炎</label> </div>
+            <input type="text" id="oral_notes" name="oral_notes" class="notes-input" placeholder="補充說明...">
+             <label class="question-label">7. 咽喉：</label>
+            <div class="checkbox-group" data-notes-id="throat_notes"> <label><input type="checkbox" name="throat" value="咽乾"> 咽乾</label> <label><input type="checkbox" name="throat" value="咽喉痛"> 咽喉痛</label> <label><input type="checkbox" name="throat" value="喉嚨癢"> 喉嚨癢</label> <label><input type="checkbox" name="throat" value="咽喉堵塞感"> 咽喉堵塞感</label> <label><input type="checkbox" name="throat" value="聲音啞"> 聲音啞</label> </div>
+            <input type="text" id="throat_notes" name="throat_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">8. 咳嗽 / 痰 / 涕：</label>
+            <div class="checkbox-group" data-notes-id="cough_notes"> <label><input type="checkbox" name="cough" value="乾咳無痰"> 乾咳無痰</label> <label><input type="checkbox" name="cough" value="濕咳"> 濕咳</label> <label><input type="checkbox" name="cough" value="痰咳"> 痰咳</label> <label><input type="checkbox" name="cough" value="痰多難咳"> 痰多難咳</label> <label><input type="checkbox" name="cough" value="咳嗽夜間加重"> 咳嗽夜間加重</label> <label><input type="checkbox" name="cough" value="濃黃痰涕"> 濃黃痰涕</label> <label><input type="checkbox" name="cough" value="濃白痰涕"> 濃白痰涕</label> <label><input type="checkbox" name="cough" value="清痰"> 清痰/涕</label> <label><input type="checkbox" name="cough" value="泡沬清痰"> 泡沬清痰</label> <label><input type="checkbox" name="cough" value="咳血"> 咳血</label> </div>
+            <input type="text" id="cough_notes" name="cough_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">9. 胸腔 / 心臟：</label>
+            <div class="checkbox-group" data-notes-id="chest_heart_notes"> <label><input type="checkbox" name="chest_heart" value="胸口悶痛"> 胸口悶痛</label> <label><input type="checkbox" name="chest_heart" value="心慌"> 心慌</label> <label><input type="checkbox" name="chest_heart" value="氣短"> 氣短</label> <label><input type="checkbox" name="chest_heart" value="哮喘"> 哮喘</label> <label><input type="checkbox" name="chest_heart" value="呼吸困難"> 呼吸困難</label> <label><input type="checkbox" name="chest_heart" value="肋骨痛"> 肋骨痛</label> <label><input type="checkbox" name="chest_heart" value="心絞痛"> 心絞痛</label> <label><input type="checkbox" name="chest_heart" value="前胸穿後背痛"> 前胸穿後背痛</label> <label><input type="checkbox" name="chest_heart" value="心悸"> 心悸</label> <label><input type="checkbox" name="chest_heart" value="脈搏經常90以上"> 脈搏經常90以上</label> </div>
+             <input type="text" id="chest_heart_notes" name="chest_heart_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">10. 食欲：</label>
+            <div class="checkbox-group" data-notes-id="appetite_notes"> <label><input type="checkbox" name="appetite" value="好"> 好</label> <label><input type="checkbox" name="appetite" value="不易餓"> 不易餓</label> <label><input type="checkbox" name="appetite" value="容易餓"> 容易餓</label> <label><input type="checkbox" name="appetite" value="餓却不想吃"> 餓却不想吃</label> </div>
+             <input type="text" id="appetite_notes" name="appetite_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">11. 飲水習慣：</label>
+            <div class="checkbox-group" data-notes-id="drinking_habit_notes"> <label><input type="checkbox" name="drinking_habit" value="喜喝冷水"> 喜喝冷水</label> <label><input type="checkbox" name="drinking_habit" value="喜喝熱水"> 喜喝熱水</label> <label><input type="checkbox" name="drinking_habit" value="喜歡大量喝水"> 喜歡大量喝水</label> <label><input type="checkbox" name="drinking_habit" value="嗜有糖冷飲"> 嗜有糖冷飲</label> </div>
+            <input type="text" id="drinking_habit_notes" name="drinking_habit_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">12. 飲食習慣：</label>
+            <div class="checkbox-group" data-notes-id="eating_habit_notes"> <label><input type="checkbox" name="eating_habit" value="辛辣"> 辛辣</label> <label><input type="checkbox" name="eating_habit" value="嗜甜食"> 嗜甜食</label> <label><input type="checkbox" name="eating_habit" value="怕辣"> 怕辣</label> <label><input type="checkbox" name="eating_habit" value="清淡"> 清淡</label> <label><input type="checkbox" name="eating_habit" value="喜熱湯"> 喜熱湯</label> </div>
+            <input type="text" id="eating_habit_notes" name="eating_habit_notes" class="notes-input" placeholder="補充說明...">
+             <label class="question-label">13. 脾胃 (消化)：</label>
+            <div class="checkbox-group" data-notes-id="digestion_notes"> <label><input type="checkbox" name="digestion" value="易痛"> 易胃痛</label> <label><input type="checkbox" name="digestion" value="胃酸"> 胃酸/火燒心</label> <label><input type="checkbox" name="digestion" value="易脹"> 易脹氣</label> <label><input type="checkbox" name="digestion" value="想吐"> 想吐/噁心</label> <label><input type="checkbox" name="digestion" value="噯氣"> 噯氣</label> <label><input type="checkbox" name="digestion" value="打嗝"> 打嗝</label> <label><input type="checkbox" name="digestion" value="胃食道逆流"> 胃食道逆流</label> </div>
+            <input type="text" id="digestion_notes" name="digestion_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">14. 大號 (排便)：</label>
+            <div class="checkbox-group" data-notes-id="bowel_movement_notes"> <label><input type="checkbox" name="bowel_movement" value="成形"> 成形</label> <label><input type="checkbox" name="bowel_movement" value="不成形"> 不成形</label> <label><input type="checkbox" name="bowel_movement" value="易腹瀉"> 易腹瀉</label> <label><input type="checkbox" name="bowel_movement" value="便秘"> 便秘</label> <label><input type="checkbox" name="bowel_movement" value="排氣多"> 排氣多</label> <label><input type="checkbox" name="bowel_movement" value="排便不暢"> 排便不暢</label> <label><input type="checkbox" name="bowel_movement" value="依賴瀉藥"> 依賴瀉藥</label> <label><input type="checkbox" name="bowel_movement" value="乾燥"> 乾燥</label> <label><input type="checkbox" name="bowel_movement" value="便血"> 便血</label> </div>
+             <input type="text" id="bowel_movement_notes" name="bowel_movement_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">15. 小便：</label>
+            <div class="checkbox-group" data-notes-id="urination_notes"> <label><input type="checkbox" name="urination" value="尿黃"> 尿黃</label> <label><input type="checkbox" name="urination" value="白濁"> 白濁</label> <label><input type="checkbox" name="urination" value="小便清長"> 小便清長</label> <label><input type="checkbox" name="urination" value="小便澀痛"> 小便澀痛</label> <label><input type="checkbox" name="urination" value="泡沫"> 泡沫</label> <label><input type="checkbox" name="urination" value="尿少"> 尿少</label> <label><input type="checkbox" name="urination" value="尿多"> 尿多</label> <label><input type="checkbox" name="urination" value="尿頻"> 尿頻</label> <label><input type="checkbox" name="urination" value="點滴不盡"> 點滴不盡</label> <label><input type="checkbox" name="urination" value="排尿困難"> 排尿困難</label> <label><input type="checkbox" name="urination" value="尿失禁"> 尿失禁</label> <label><input type="checkbox" name="urination" value="尿血"> 尿血</label> <label><input type="checkbox" name="urination" value="夜尿"> 夜尿</label> </div>
+            <input type="text" id="urination_notes" name="urination_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">16. 背部：</label>
+            <div class="checkbox-group" data-notes-id="back_notes"> <label><input type="checkbox" name="back" value="背痛"> 背痛</label> <label><input type="checkbox" name="back" value="肩痛"> 肩痛</label> <label><input type="checkbox" name="back" value="背部有寒冷感"> 背部有寒冷感</label> <label><input type="checkbox" name="back" value="後頸部痛"> 後頸部痛/僵硬</label> </div>
+             <input type="text" id="back_notes" name="back_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">17. 腰部：</label>
+            <div class="checkbox-group" data-notes-id="waist_notes"> <label><input type="checkbox" name="waist" value="腰痠"> 腰痠</label> <label><input type="checkbox" name="waist" value="腰痛"> 腰痛</label> <label><input type="checkbox" name="waist" value="下身無力"> 下身無力</label> <label><input type="checkbox" name="waist" value="彎腰困難"> 彎腰困難</label> </div>
+            <input type="text" id="waist_notes" name="waist_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">18. 腳 / 腿：</label>
+            <div class="checkbox-group" data-notes-id="legs_feet_notes"> <label><input type="checkbox" name="legs_feet" value="腿無力"> 腿無力</label> <label><input type="checkbox" name="legs_feet" value="膝蓋無力"> 膝蓋無力/酸軟</label> <label><input type="checkbox" name="legs_feet" value="大腿水腫"> 大腿水腫</label> <label><input type="checkbox" name="legs_feet" value="小腿水腫"> 小腿水腫</label> <label><input type="checkbox" name="legs_feet" value="易抽筋"> 易抽筋</label> <label><input type="checkbox" name="legs_feet" value="麻木"> 麻木</label> </div>
+            <input type="text" id="legs_feet_notes" name="legs_feet_notes" class="notes-input" placeholder="補充說明...">
+            <label class="question-label">19. 月事 (女性請填寫)：</label>
+            <div class="checkbox-group" data-notes-id="menstruation_notes"> <label><input type="checkbox" name="menstruation" value="停經"> 停經</label> <label><input type="checkbox" name="menstruation" value="提前"> 週期提前</label> <label><input type="checkbox" name="menstruation" value="延後"> 週期延後</label> <label><input type="checkbox" name="menstruation" value="色淡"> 經血色淡</label> <label><input type="checkbox" name="menstruation" value="色暗"> 經血色暗</label> <label><input type="checkbox" name="menstruation" value="量多"> 量多</label> <label><input type="checkbox" name="menstruation" value="量少"> 量少</label> <label><input type="checkbox" name="menstruation" value="有血塊"> 有血塊</label> <label><input type="checkbox" name="menstruation" value="總是經痛"> 總是經痛</label> <label><input type="checkbox" name="menstruation" value="未滿50歲停經"> 未滿50歲停經</label> <label><input type="checkbox" name="menstruation" value="天數總是多於7天"> 經期天數>7天</label> <label><input type="checkbox" name="menstruation" value="天數總是少於3天"> 經期天數<3天</label> <br> <label for="menopause_age" style="display:inline-block; margin-right: 5px; font-weight:normal;">停經年齡(若適用):</label> <input type="number" id="menopause_age" name="menopause_age" min="0" style="width: 80px; display: inline-block; vertical-align: middle; padding: 5px; margin-bottom: 5px;"> </div>
+            <input type="text" id="menstruation_notes" name="menstruation_notes" class="notes-input" placeholder="月事相關補充說明...">
+            <label class="question-label">20. 冷 / 熱 感覺：</label>
+            <div class="checkbox-group" data-notes-id="temperature_sensation_notes"> <label><input type="checkbox" name="temperature_sensation" value="怕冷"> 怕冷</label> <label><input type="checkbox" name="temperature_sensation" value="怕熱"> 怕熱</label> <label><input type="checkbox" name="temperature_sensation" value="怕風"> 怕風</label> <label><input type="checkbox" name="temperature_sensation" value="手冷"> 手冷</label> <label><input type="checkbox" name="temperature_sensation" value="腳冷"> 腳冷</label> <label><input type="checkbox" name="temperature_sensation" value="手心熱"> 手心熱</label> <label><input type="checkbox" name="temperature_sensation" value="上身熱下身寒"> 上身熱下身寒</label> <label><input type="checkbox" name="temperature_sensation" value="上身寒下身熱"> 上身寒下身熱</label> </div>
+            <input type="text" id="temperature_sensation_notes" name="temperature_sensation_notes" class="notes-input" placeholder="補充說明...">
+             <label class="question-label">21. 流汗：</label>
+            <div class="checkbox-group" data-notes-id="sweating_notes"> <label><input type="checkbox" name="sweating" value="易出汗"> 易出汗</label> <label><input type="checkbox" name="sweating" value="多汗"> 多汗</label> <label><input type="checkbox" name="sweating" value="少汗"> 少汗/無汗</label> <label><input type="checkbox" name="sweating" value="額頭冒冷汗"> 額頭冒冷汗</label> <label><input type="checkbox" name="sweating" value="背部盜汗"> 背部盜汗</label> </div>
+            <input type="text" id="sweating_notes" name="sweating_notes" class="notes-input" placeholder="補充說明...">
+
+        </fieldset>
+
+
+        <!-- Confirmation Button (Always Visible initially) -->
+        <button type="button" id="confirmButton" onclick="generateSummary()">確認並彙整資訊</button>
+
+        <!-- Summary Output Area -->
+        <div id="summaryOutput"></div>
+
+        <!-- AI Response Output Area -->
+        <div id="aiResponseOutput">
+             <!-- Disclaimer text is removed as per user code, but div kept for structure -->
+             <div class="ai-disclaimer"> </div>
+        </div>
+
+         <!-- AI Submit Button (Appears after Summary) -->
+        <button type="button" id="submitAiButton" onclick="submitToAi()" disabled>提交 AI 分析</button>
+
+    </form>
+
+    <script>
+        // --- Constants ---
+        // WARNING: Exposing API keys in client-side code is insecure!
+        const GEMINI_API_KEY = "AIzaSyDwt-vuhOQ3iFuxHzgIzVmBJf7UOCrn0wg"; // DEMO KEY
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+        // --- Helper Functions (getValue, getValuePlain, getRadioValue, getCheckboxValues) ---
+         const getValue = (id, placeholder = '') => { const element = document.getElementById(id); if (!element) return placeholder; let value = element.value.trim(); return value ? value.replace(/\n/g, '<br>') : placeholder; };
+         const getValuePlain = (id, placeholder = '') => { const element = document.getElementById(id); if (!element) return placeholder; let value = element.value.trim(); return value ? value : placeholder; };
+         const getRadioValue = (name, placeholder = '未選擇') => { const radios = document.forms["tcmForm"].elements[name]; if (!radios) return placeholder; if (radios.value !== undefined && radios.checked !== undefined) { return radios.checked ? radios.value : placeholder; } if (radios.length > 0) { for (let i = 0; i < radios.length; i++) { if (radios[i].checked) return radios[i].value; } } return placeholder; };
+         const getCheckboxValues = (name) => { const checkboxes = document.forms["tcmForm"].elements[name]; const selectedValues = []; if (!checkboxes) return selectedValues; if (checkboxes.length === undefined) { if (checkboxes.checked) selectedValues.push(checkboxes.value); } else { for (let i = 0; i < checkboxes.length; i++) { if (checkboxes[i].checked) selectedValues.push(checkboxes[i].value); } } return selectedValues; };
+
+
+        // --- BMI Calculation ---
+        function calculateBmi() {
+             const heightInput = document.getElementById('height'); const weightInput = document.getElementById('weight'); const bmiValueSpan = document.getElementById('bmi_value'); const bodyTypeRadios = document.getElementsByName('body_type'); const heightCm = parseFloat(heightInput.value); const weightKg = parseFloat(weightInput.value); let bmi = null; let bodyType = null; if (heightCm > 0 && weightKg > 0) { const heightM = heightCm / 100; bmi = weightKg / (heightM * heightM); bmiValueSpan.textContent = bmi.toFixed(1); if (bmi < 17.0) bodyType = '瘦'; else if (bmi < 18.5) bodyType = '偏瘦'; else if (bmi < 24.0) bodyType = '標準'; else if (bmi < 28.0) bodyType = '偏胖'; else bodyType = '肥胖'; } else { bmiValueSpan.textContent = '--'; } let foundRadio = false; bodyTypeRadios.forEach(radio => { if (radio.value === bodyType) { radio.checked = true; foundRadio = true; }}); if (!foundRadio) { bodyTypeRadios.forEach(radio => radio.checked = false); }
+        }
+
+        // --- Vaccine Details ---
+        function toggleVaccineDetails(show) {
+            const detailsContainer = document.getElementById('vaccine_details_container'); detailsContainer.style.display = show ? 'block' : 'none'; if (!show) document.getElementById('vaccine_details_input').value = '';
+        }
+
+        // --- Format AI Response (Basic Markdown to HTML) ---
+        function formatAiResponse(text) {
+            if (!text) return '<p>AI 未提供回應內容。</p>';
+            let html = ''; const lines = text.split('\n'); let inList = null;
+            const closeList = () => { if (inList === 'ul') html += '</ul>\n'; else if (inList === 'ol') html += '</ol>\n'; inList = null; };
+            lines.forEach(line => {
+                line = line.trim();
+                if (line.startsWith('### ')) { closeList(); html += `<h4>${line.substring(4).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</h4>\n`; }
+                else if (line.startsWith('## ')) { closeList(); html += `<h3>${line.substring(3).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</h3>\n`; }
+                 else if (line.startsWith('# ')) { closeList(); html += `<h2>${line.substring(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</h2>\n`; }
+                else if (line.startsWith('* ') || line.startsWith('- ')) { if (inList !== 'ul') { closeList(); html += '<ul>\n'; inList = 'ul'; } let listItem = line.substring(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); html += `<li>${listItem}</li>\n`; }
+                else if (line.match(/^\d+\.\s+/)) { if (inList !== 'ol') { closeList(); html += '<ol>\n'; inList = 'ol'; } let listItem = line.replace(/^\d+\.\s+/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); html += `<li>${listItem}</li>\n`; }
+                else if (line) { closeList(); let paragraph = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); html += `<p>${paragraph}</p>\n`; }
+                else { closeList(); }
+            });
+            closeList(); return html;
+        }
+
+        // --- Generate HTML Summary ---
+        function generateSummary() {
+            const form = document.getElementById('tcmForm');
+            const summaryDiv = document.getElementById('summaryOutput');
+            const aiButton = document.getElementById('submitAiButton');
+            let summaryHTML = '<h2>已填寫資訊彙整：</h2>';
+             const formatCheckboxListHTML = (label, name, noteId) => { const values = getCheckboxValues(name); const noteValue = getValue(noteId); let itemHTML = ''; if (values.length > 0) { itemHTML += `<p><strong>${label}</strong></p><ul>`; values.forEach(val => { itemHTML += `<li>${val}</li>`; }); itemHTML += `</ul>`; if (noteValue) { itemHTML += `<p class="notes">補充： ${noteValue}</p>`; } } else if (noteValue) {} return itemHTML; };
+             summaryHTML += '<fieldset><legend>基本資訊</legend>'; summaryHTML += `<p><strong>姓名:</strong> ${getValue('name', '未填寫')}</p>`; summaryHTML += `<p><strong>性別:</strong> ${getRadioValue('gender')}</p>`; summaryHTML += `<p><strong>年齡:</strong> ${getValue('age', '未填寫')}</p>`; summaryHTML += `<p><strong>身高:</strong> ${getValue('height', '未填寫')} cm</p>`; summaryHTML += `<p><strong>體重:</strong> ${getValue('weight', '未填寫')} kg</p>`; summaryHTML += `<p><strong>BMI:</strong> ${document.getElementById('bmi_value').textContent}</p>`; summaryHTML += `<p><strong>體型:</strong> ${getRadioValue('body_type')}</p>`; const vaccineStatus = getRadioValue('vaccine_status'); summaryHTML += `<p><strong>接種疫苗:</strong> ${vaccineStatus}`; if (vaccineStatus === '有') { summaryHTML += ` (${getValue('vaccine_details', '未詳述')})`; } summaryHTML += '</p></fieldset>';
+             summaryHTML += '<fieldset><legend>主訴</legend>'; summaryHTML += `<p><strong>主要不適:</strong> ${getValue('main_complaint', '未填寫')}</p>`; summaryHTML += `<p><strong>開始時間:</strong> ${getValue('symptom_start_date', '未填寫')}</p>`; summaryHTML += `<p><strong>治療經歷:</strong> ${getValue('treatment_history', '未填寫')}</p>`; summaryHTML += '</fieldset>';
+             summaryHTML += '<fieldset><legend>問診資訊</legend>';
+             summaryHTML += formatCheckboxListHTML('1. 精神:', 'spirit', 'spirit_notes');
+             summaryHTML += formatCheckboxListHTML('2. 睡眠:', 'sleep', 'sleep_notes');
+             summaryHTML += formatCheckboxListHTML('3. 頭部:', 'head', 'head_notes');
+             summaryHTML += formatCheckboxListHTML('4. 頭皮/頭髮:', 'scalp_hair', 'scalp_hair_notes');
+             summaryHTML += formatCheckboxListHTML('5. 眼睛:', 'eyes', 'eyes_notes');
+             summaryHTML += formatCheckboxListHTML('6. 口腔:', 'oral', 'oral_notes');
+             summaryHTML += formatCheckboxListHTML('7. 咽喉:', 'throat', 'throat_notes');
+             summaryHTML += formatCheckboxListHTML('8. 咳嗽/痰/涕:', 'cough', 'cough_notes');
+             summaryHTML += formatCheckboxListHTML('9. 胸腔/心臟:', 'chest_heart', 'chest_heart_notes');
+             summaryHTML += formatCheckboxListHTML('10. 食欲:', 'appetite', 'appetite_notes');
+             summaryHTML += formatCheckboxListHTML('11. 飲水習慣:', 'drinking_habit', 'drinking_habit_notes');
+             summaryHTML += formatCheckboxListHTML('12. 飲食習慣:', 'eating_habit', 'eating_habit_notes');
+             summaryHTML += formatCheckboxListHTML('13. 脾胃:', 'digestion', 'digestion_notes');
+             summaryHTML += formatCheckboxListHTML('14. 大號:', 'bowel_movement', 'bowel_movement_notes');
+             summaryHTML += formatCheckboxListHTML('15. 小便:', 'urination', 'urination_notes');
+             summaryHTML += formatCheckboxListHTML('16. 背部:', 'back', 'back_notes');
+             summaryHTML += formatCheckboxListHTML('17. 腰部:', 'waist', 'waist_notes');
+             summaryHTML += formatCheckboxListHTML('18. 腳/腿:', 'legs_feet', 'legs_feet_notes');
+             if (form.elements['gender'] && getRadioValue('gender') === '女') { const menstruationValues = getCheckboxValues('menstruation'); const menstruationNote = getValue('menstruation_notes'); let menstruationHTML = ''; if (menstruationValues.length > 0) { menstruationHTML += `<p><strong>19. 月事:</strong></p><ul>`; menstruationValues.forEach(val => { menstruationHTML += `<li>${val}</li>`; }); if (menstruationValues.includes('停經')) { menstruationHTML += `<li>停經年齡: ${getValue('menopause_age', '未填寫')}</li>`; } menstruationHTML += `</ul>`; if(menstruationNote) { menstruationHTML += `<p class="notes">補充： ${menstruationNote}</p>`; } } else if (menstruationNote) { menstruationHTML += `<p><strong>19. 月事:</strong></p><p class="notes">補充： ${menstruationNote}</p>`; } summaryHTML += menstruationHTML; }
+             summaryHTML += formatCheckboxListHTML('20. 冷/熱感覺:', 'temperature_sensation', 'temperature_sensation_notes');
+             summaryHTML += formatCheckboxListHTML('21. 流汗:', 'sweating', 'sweating_notes');
+             summaryHTML += '</fieldset>';
+
+            summaryDiv.innerHTML = summaryHTML;
+            summaryDiv.style.display = 'block';
+            aiButton.style.display = 'block'; // Show AI button AFTER summary
+            aiButton.disabled = false;      // Enable AI button
+            summaryDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+         // --- Generate Plain Text Summary for AI ---
+        function generatePlainTextSummary() {
+            const form = document.getElementById('tcmForm'); let plainText = "中醫問卷彙整資訊：\n\n"; const formatCheckboxListPlain = (label, name, noteId) => { const values = getCheckboxValues(name); const noteValue = getValuePlain(noteId); let itemText = ''; if (values.length > 0) { itemText += `${label} ${values.join(', ')}\n`; if (noteValue) { itemText += `  補充說明： ${noteValue}\n`; } } else if (noteValue) { } return itemText; };
+             plainText += "【基本資訊】\n"; plainText += `- 姓名: ${getValuePlain('name', '未填寫')}\n`; plainText += `- 性別: ${getRadioValue('gender')}\n`; plainText += `- 年齡: ${getValuePlain('age', '未填寫')}\n`; plainText += `- 身高: ${getValuePlain('height', '未填寫')} cm\n`; plainText += `- 體重: ${getValuePlain('weight', '未填寫')} kg\n`; plainText += `- BMI: ${document.getElementById('bmi_value').textContent}\n`; plainText += `- 體型: ${getRadioValue('body_type')}\n`; const vaccineStatus = getRadioValue('vaccine_status'); plainText += `- 接種疫苗: ${vaccineStatus}`; if (vaccineStatus === '有') { plainText += ` (${getValuePlain('vaccine_details', '未詳述')})\n`; } else { plainText += '\n'; }
+             plainText += "\n【主訴】\n"; plainText += `- 主要不適: ${getValuePlain('main_complaint', '未填寫')}\n`; plainText += `- 開始時間: ${getValuePlain('symptom_start_date', '未填寫')}\n`; plainText += `- 治療經歷: ${getValuePlain('treatment_history', '未填寫')}\n`;
+             plainText += "\n【問診資訊】\n";
+             plainText += formatCheckboxListPlain('1. 精神:', 'spirit', 'spirit_notes');
+             plainText += formatCheckboxListPlain('2. 睡眠:', 'sleep', 'sleep_notes');
+             plainText += formatCheckboxListPlain('3. 頭部:', 'head', 'head_notes');
+             plainText += formatCheckboxListPlain('4. 頭皮/頭髮:', 'scalp_hair', 'scalp_hair_notes');
+             plainText += formatCheckboxListPlain('5. 眼睛:', 'eyes', 'eyes_notes');
+             plainText += formatCheckboxListPlain('6. 口腔:', 'oral', 'oral_notes');
+             plainText += formatCheckboxListPlain('7. 咽喉:', 'throat', 'throat_notes');
+             plainText += formatCheckboxListPlain('8. 咳嗽/痰/涕:', 'cough', 'cough_notes');
+             plainText += formatCheckboxListPlain('9. 胸腔/心臟:', 'chest_heart', 'chest_heart_notes');
+             plainText += formatCheckboxListPlain('10. 食欲:', 'appetite', 'appetite_notes');
+             plainText += formatCheckboxListPlain('11. 飲水習慣:', 'drinking_habit', 'drinking_habit_notes');
+             plainText += formatCheckboxListPlain('12. 飲食習慣:', 'eating_habit', 'eating_habit_notes');
+             plainText += formatCheckboxListPlain('13. 脾胃:', 'digestion', 'digestion_notes');
+             plainText += formatCheckboxListPlain('14. 大號:', 'bowel_movement', 'bowel_movement_notes');
+             plainText += formatCheckboxListPlain('15. 小便:', 'urination', 'urination_notes');
+             plainText += formatCheckboxListPlain('16. 背部:', 'back', 'back_notes');
+             plainText += formatCheckboxListPlain('17. 腰部:', 'waist', 'waist_notes');
+             plainText += formatCheckboxListPlain('18. 腳/腿:', 'legs_feet', 'legs_feet_notes');
+              if (form.elements['gender'] && getRadioValue('gender') === '女') { const menstruationValues = getCheckboxValues('menstruation'); const menstruationNote = getValuePlain('menstruation_notes'); if(menstruationValues.length > 0 || menstruationNote) { plainText += `19. 月事: ${menstruationValues.join(', ')}`; if (menstruationValues.includes('停經')) { plainText += ` (停經年齡: ${getValuePlain('menopause_age', '未填寫')})`; } if (menstruationNote) { plainText += `\n  補充說明： ${menstruationNote}`; } plainText += '\n'; } }
+             plainText += formatCheckboxListPlain('20. 冷/熱感覺:', 'temperature_sensation', 'temperature_sensation_notes');
+             plainText += formatCheckboxListPlain('21. 流汗:', 'sweating', 'sweating_notes');
+            return plainText;
+        }
+
+
+        // --- Submit to AI ---
+        async function submitToAi() {
+            const aiButton = document.getElementById('submitAiButton');
+            const aiOutputDiv = document.getElementById('aiResponseOutput');
+            const summaryDiv = document.getElementById('summaryOutput');
+
+             if (summaryDiv.style.display !== 'block' || !summaryDiv.innerHTML.includes('彙整')) {
+                aiOutputDiv.innerHTML = '<p class="error">請先點擊「確認並彙整資訊」按鈕生成摘要。</p>';
+                aiOutputDiv.style.display = 'block';
+                return;
+            }
+
+            aiButton.disabled = true; // Disable button during request
+            aiOutputDiv.style.display = 'block';
+            aiOutputDiv.innerHTML = '<p class="loading">正在請求 AI 分析，請稍候...</p><div class="ai-disclaimer"> </div>'; // Keep disclaimer div empty
+            aiOutputDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+            const plainTextSummary = generatePlainTextSummary();
+
+            // --- Updated AI Prompt with Template & Assertive Tone Request ---
+            const prompt = `
+            您是一位經驗豐富的中醫師。請根據以下使用者填寫的中醫問卷資訊，進行初步分析，請充滿自信且不敷衍，不須模稜兩可，必須專斷。
+            請**嚴格按照**以下模板和指示進行回覆：
+
+            **一、整體辨證分析：**
+            [在此處列出 1-3 個主要觀察到的證候群或病理狀態，例如：
+            1.  **證候群名稱 (如：陰虛火旺、內熱偏盛)**
+                *   **表現：** (列舉問卷中支持此證候群的具體症狀，如：口渴多飲、咽乾、眼白有血絲...)
+                *   **分析：** (簡要解釋這些症狀在中醫理論中可能的成因和關聯，如：長期嗜食辛辣...造成陰虛火旺...)
+            2.  **另一個證候群名稱 (如：氣陰兩虛，兼有脾腎虧虛)**
+                *   **表現：** (列舉相關症狀...)
+                *   **分析：** (簡要分析...)]
+
+            **二、中醫證型初步研判：**
+            [根據上述分析，總結出一個或幾個最可能的核心中醫證型，格式如下：
+            *   **主證：** [核心證型名稱，例如：「陰虛火旺、氣陰兩虛，兼肝火內擾」 或 「脾腎陽虛、水濕內停」]]
+
+            **三、治法思路：**
+            [基於初步研判的證型，列出對應的治療原則/方向，例如：
+            *   養陰清熱
+            *   益氣健脾
+            *   滋補肝腎
+            *   疏肝理氣 等]
+
+            **四、常用方劑參考方向：**
+            [列舉幾個與上述治法和證型相關的代表性方劑名稱，例如：
+            *   若偏重陰虛火旺，可參考：知柏地黃丸、天王補心丹等思路。
+            *   若偏重氣陰兩虛，可參考：生脈散、參麥飲等思路。
+            *   ...
+            *   並提供以上各方劑的成分與用量，請依照方劑內容直接提供，不須說明"由醫生根據患者實際情況調整。"]
+
+            **五、生活調理建議：**
+            [提供具體的、與辨證分析相關的生活作息、飲食、情緒、運動建議，例如：
+            *   **飲食調整：** (避免什麼？宜食什麼？)
+            *   **作息情緒：** (睡眠建議、情緒調節方法...)
+            *   **運動活動：** (推薦的運動類型、注意事項...)]
+
+            --------------------
+            以下是使用者填寫的問卷資訊：
+            ${plainTextSummary}
+            --------------------
+
+            請根據以上模板和問卷資訊，生成您的專業初步分析：
+            `;
+
+
+            try {
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', },
+                    body: JSON.stringify({
+                         contents: [{ parts: [{ text: prompt }] }],
+                         // Add safety settings to potentially mitigate harmful content generation,
+                         // even though the prompt asks for dosages. BLOCK_NONE is permissive, consider stricter.
+                         // BLOCK_LOW_AND_ABOVE or BLOCK_MEDIUM_AND_ABOVE might prevent dosage details.
+                          "safetySettings": [
+                            { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" },
+                            // Add other categories if needed, e.g., medical advice might fall under dangerous content
+                            { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
+                            { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
+                            { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" }
+                          ]
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('API Error Response:', errorData);
+                    throw new Error(`API請求失敗 ${response.status}: ${errorData?.error?.message || response.statusText}`);
+                }
+
+                const data = await response.json();
+                let aiText = "未能從 AI 回應中提取有效內容。";
+
+                 // Check for blocked content FIRST
+                 if (data.promptFeedback && data.promptFeedback.blockReason) {
+                     aiText = `請求因安全設定被 AI 阻止，原因：${data.promptFeedback.blockReason}. (${data.promptFeedback.safetyRatings.map(r => `${r.category}: ${r.probability}`).join(', ')})`;
+                     aiOutputDiv.innerHTML = `<p class="error">${aiText}</p><div class="ai-disclaimer"> </div>`; // Keep disclaimer div empty
+                     console.warn('AI Content Blocked:', data.promptFeedback);
+                 }
+                 // Then check for valid candidate content
+                 else if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text) {
+                    aiText = data.candidates[0].content.parts[0].text;
+                    const formattedHtml = formatAiResponse(aiText);
+                    aiOutputDiv.innerHTML = `<h2>AI 初步分析：</h2>${formattedHtml}<div class="ai-disclaimer"> </div>`; // Keep disclaimer div empty
+                }
+                 // Handle finishReason other than STOP (e.g., SAFETY, RECITATION, MAX_TOKENS)
+                 else if (data.candidates && data.candidates[0].finishReason && data.candidates[0].finishReason !== "STOP") {
+                     aiText = `AI 回應因 '${data.candidates[0].finishReason}' 而中止。可能內容不完整或觸發安全規則。`;
+                      aiOutputDiv.innerHTML = `<p class="error">${aiText}</p><div class="ai-disclaimer"> </div>`; // Keep disclaimer div empty
+                     console.warn('AI Finish Reason:', data.candidates[0].finishReason);
+                 }
+                 // Fallback for unexpected structure
+                 else {
+                     console.warn('Unexpected AI response structure:', data);
+                     aiOutputDiv.innerHTML = `<p class="error">${aiText}</p><div class="ai-disclaimer"> </div>`; // Keep disclaimer div empty
+                 }
+
+            } catch (error) {
+                console.error("提交 AI 分析時發生錯誤:", error);
+                aiOutputDiv.innerHTML = `<p class="error">分析失敗：${error.message}</p><div class="ai-disclaimer"> </div>`; // Keep disclaimer div empty
+            } finally {
+                aiButton.disabled = false; // Re-enable button AFTER request completes
+            }
+        }
+
+        // --- Initial setup ---
+        document.addEventListener('DOMContentLoaded', (event) => {
+            calculateBmi();
+            if (!document.getElementById('vaccine_yes').checked) {
+                 toggleVaccineDetails(false);
+            }
+            document.getElementById('summaryOutput').style.display = 'none';
+            document.getElementById('aiResponseOutput').style.display = 'none';
+            document.getElementById('submitAiButton').style.display = 'none'; // Hide AI button initially
+            document.getElementById('submitAiButton').disabled = true;
+
+            // Add focus styles for better mobile interaction (optional but good)
+            const inputs = document.querySelectorAll('input, textarea, button');
+            inputs.forEach(input => {
+                input.addEventListener('focus', () => input.style.outline = '2px solid #3498db');
+                input.addEventListener('blur', () => input.style.outline = 'none');
+            });
+        });
+    </script>
+
+</body>
+</html>
